@@ -8,31 +8,6 @@
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <style>
-    /* Quick fixes to make sure elements work properly */
-    #side-menu {
-      z-index: 1001;
-      left: -250px;
-      transition: left 0.3s ease;
-    }
-
-    #side-menu.active {
-      left: 0;
-    }
-
-    .overlay {
-      display: none;
-      z-index: 1000;
-    }
-
-    .overlay.active {
-      display: block;
-    }
-
-    #logout-btn {
-      cursor: pointer;
-    }
-  </style>
 </head>
 
 <body>
@@ -40,43 +15,55 @@
     <div id="users-list">
       <div class="overlay" id="overlay"></div>
       <div id="side-menu">
-        <img id="closeSideMenu" src="{{ url_for('static', filename='images/menu.png') }}" alt="">
-        <div id="add-contact">
-          <img id="add-contact-img" src="{{ url_for('static', filename='images/add-contact.png') }}" alt="">
-          <div id="add-friend">Add contact</div>
+        <div id="closeSideMenu">
+          <div class="burger-line"></div>
+          <div class="burger-line"></div>
+          <div class="burger-line"></div>
         </div>
-        <div id="create-group">
-          <img id="group-img" src="{{ url_for('static', filename='images/group.png') }}" alt="">
-          <div id="group">Create a group</div>
+        <div class="menu-items">
+          <a href="#" class="menu-item">
+            <img src="{{ url_for('static', filename='images/add-contact.png') }}" alt="Add contact">
+            <span>Add contact</span>
+          </a>
+          <a href="#" class="menu-item">
+            <img src="{{ url_for('static', filename='images/group.png') }}" alt="Create a group">
+            <span>Create a group</span>
+          </a>
+          <a href="#" class="menu-item">
+            <img src="{{ url_for('static', filename='images/logout.png') }}" alt="Log out">
+            <span>Log out</span>
+          </a>
         </div>
-        <button id="logout-btn" title="Logout">
-          <img id="logout-img" src="{{ url_for('static', filename='images/logout.png') }}" alt="">
-          <div id="logout">Log out</div>
-        </button>
       </div>
       <div id="users-header">
-        <img id="openSideMenu" src="{{ url_for('static', filename='images/menu.png') }}" alt="">
+        <div id="openSideMenu">
+          <div class="burger-line"></div>
+          <div class="burger-line"></div>
+          <div class="burger-line"></div>
+        </div>
+        <div class="search-wrapper">
+          <img src="{{ url_for('static', filename='images/search.png') }}" class="search-icon" alt="">
+          <input type="text" id="contact-search-input" placeholder="Find contact">
+        </div>
         <h3>Chats</h3>
       </div>
-      <div id="search-container">
-        <input type="text" id="contact-search-input" placeholder="Search contacts and groups...">
-      </div>
-      <ul id="users"></ul>
+      <ul id="users">
+        <!-- Контакты будут загружены динамически через JavaScript -->
+      </ul>
     </div>
 
     <div id="chat-box">
       <div id="chat-header">
-        <div class="left">
-          <div onclick="toggleChat()"><img id="star" src="{{ url_for('static', filename='images/star.png') }}" alt="">
-          </div>
-          <img id="settings" src="{{ url_for('static', filename='images/settings.png') }}" alt="">
+        <div id="chat-header-left"></div>
+        <div id="chat-header-right">
+          <img id="star" src="{{ url_for('static', filename='images/star.png') }}" alt="" class="header-icon">
+          <img id="settings" src="{{ url_for('static', filename='images/settings.png') }}" alt="" class="header-icon">
         </div>
-        <div id="chat-header-title"></div>
       </div>
       <div id="messages"></div>
       <div id="input-container">
-        <input type="text" id="message-input" placeholder="Type a message..." disabled />
-        <button id="send-button" disabled>Send</button>
+        <input type="text" id="message-input" placeholder="Type a message..." />
+        <button id="send-button">Send</button>
       </div>
     </div>
   </div>
@@ -102,14 +89,12 @@
   <!-- Add Contact Modal -->
   <div id="add-contact-modal" class="modal">
     <div class="modal-content">
-      <span class="close-modal">&times;</span>
       <h2>Add New Contact</h2>
-      <div class="modal-form">
-        <input type="text" id="contact-identifier" placeholder="Username or Email">
-        <input type="text" id="contact-display-name" placeholder="Display Name (optional)">
-        <p id="modal-error-msg"></p>
-        <button id="submit-contact">Add Contact</button>
-      </div>
+      <span class="close-modal">&times;</span>
+      <div id="modal-error-msg" class="error-message"></div>
+      <input type="text" id="contact-identifier" placeholder="Username or Email">
+      <input type="text" id="contact-display-name" placeholder="Display Name (optional)">
+      <button id="submit-contact">Add Contact</button>
     </div>
   </div>
 

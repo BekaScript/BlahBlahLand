@@ -2,10 +2,26 @@
 function initUI() {
   initSidebar();
   initAIChat();
-  initAddContactModal();
   initSearch();
   initLogout();
   initChat();
+  
+  // Инициализируем модальные окна, но не открываем их
+  const addContactModal = document.getElementById("add-contact-modal");
+  const createGroupModal = document.getElementById("create-group-modal");
+  const groupSettingsModal = document.getElementById("group-settings-modal");
+  const contactSettingsModal = document.getElementById("contact-settings-modal");
+  const addToGroupModal = document.getElementById("add-to-group-modal");
+  
+  // Скрываем все модальные окна при инициализации
+  if (addContactModal) addContactModal.style.display = "none";
+  if (createGroupModal) createGroupModal.style.display = "none";
+  if (groupSettingsModal) groupSettingsModal.style.display = "none";
+  if (contactSettingsModal) contactSettingsModal.style.display = "none";
+  if (addToGroupModal) addToGroupModal.style.display = "none";
+
+  // Инициализируем обработчики событий для модальных окон
+  initAddContactModal();
   initContactSettings();
   initGroupModals();
 
@@ -21,8 +37,7 @@ function initSidebar() {
   const sideMenu = document.getElementById("side-menu");
   const openSideMenuBtn = document.getElementById("openSideMenu");
   const closeSideMenuBtn = document.getElementById("closeSideMenu");
-  const addContactEl = document.getElementById("add-contact");
-  const createGroupEl = document.getElementById("create-group");
+  const menuItems = document.querySelectorAll(".menu-item");
 
   if (!openSideMenuBtn || !closeSideMenuBtn) {
     return;
@@ -48,24 +63,27 @@ function initSidebar() {
     overlay.addEventListener("click", closeSideMenu);
   }
 
-  // Add contact button
-  if (addContactEl) {
-    addContactEl.addEventListener("click", function () {
-      const modal = document.getElementById("add-contact-modal");
-      if (modal) {
-        modal.style.display = "block";
+  // Add event listeners to menu items
+  menuItems.forEach(item => {
+    const text = item.querySelector("span").textContent.trim();
+    
+    item.addEventListener("click", function(e) {
+      e.preventDefault();
+      
+      if (text === "Add contact") {
+        const modal = document.getElementById("add-contact-modal");
+        if (modal) {
+          modal.style.display = "block";
+          closeSideMenu();
+        }
+      } else if (text === "Create a group") {
+        openCreateGroupModal();
         closeSideMenu();
+      } else if (text === "Log out") {
+        logoutUser();
       }
     });
-  }
-
-  // Create group button
-  if (createGroupEl) {
-    createGroupEl.addEventListener("click", function () {
-      openCreateGroupModal();
-      closeSideMenu();
-    });
-  }
+  });
 }
 
 // AI Chat functionality
@@ -262,6 +280,7 @@ function initAddContactModal() {
   const submitButton = document.getElementById("submit-contact");
 
   if (!modal || !closeButton || !submitButton) {
+    console.log("Debug: Modal elements not found", { modal, closeButton, submitButton });
     return;
   }
 
@@ -274,7 +293,14 @@ function initAddContactModal() {
     const contactDisplayName = document.getElementById("contact-display-name");
     const errorMsg = document.getElementById("modal-error-msg");
 
+    console.log("Debug: Add contact button clicked", { 
+      contactIdentifier: contactIdentifier ? contactIdentifier.value : "not found", 
+      contactDisplayName: contactDisplayName ? contactDisplayName.value : "not found",
+      errorMsg: errorMsg ? "found" : "not found"
+    });
+
     if (!contactIdentifier || !errorMsg) {
+      console.log("Debug: Required elements missing", { contactIdentifier, errorMsg });
       return;
     }
 
@@ -282,9 +308,12 @@ function initAddContactModal() {
     const displayName = contactDisplayName ? contactDisplayName.value.trim() : "";
 
     if (!identifier) {
+      console.log("Debug: Empty identifier");
       errorMsg.textContent = "Username or email is required";
       return;
     }
+
+    console.log("Debug: Sending contact add request", { identifier, displayName });
 
     // Add contact API call
     fetch('/api/contacts', {
@@ -297,8 +326,12 @@ function initAddContactModal() {
         displayName: displayName || null
       }),
     })
-      .then(response => response.json())
+      .then(response => {
+        console.log("Debug: Contact add response status", response.status);
+        return response.json();
+      })
       .then(data => {
+        console.log("Debug: Contact add response data", data);
         if (data.success) {
           // Close modal and refresh contacts
           modal.style.display = "none";
@@ -313,6 +346,7 @@ function initAddContactModal() {
         }
       })
       .catch(error => {
+        console.error("Debug: Contact add error", error);
         errorMsg.textContent = "An error occurred. Please try again.";
       });
   });
@@ -329,35 +363,37 @@ function initAddContactModal() {
 
 // Logout functionality
 function initLogout() {
-  const logoutBtn = document.getElementById("logout-btn");
-
-  if (!logoutBtn) {
-    return;
-  }
-
-  logoutBtn.addEventListener("click", function () {
-    logoutUser();
+  const menuItems = document.querySelectorAll('.menu-item');
+  
+  menuItems.forEach(item => {
+    const text = item.querySelector('span')?.textContent.trim();
+    if (text === 'Log out') {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        logoutUser();
+      });
+    }
   });
+}
 
-  function logoutUser() {
-    fetch('/logout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+function logoutUser() {
+  fetch('/logout', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        window.location.href = '/login';
+      } else {
+        console.error('Logout failed');
       }
     })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          window.location.href = '/login';
-        } else {
-          // Error handling for logout
-        }
-      })
-      .catch(error => {
-        // Error handling for logout request
-      });
-  }
+    .catch(error => {
+      console.error('Error during logout:', error);
+    });
 }
 
 // Check login status
@@ -608,8 +644,8 @@ function loadMessages(id, type) {
               const messageActions = document.createElement('div');
               messageActions.className = 'message-actions';
               messageActions.innerHTML = `
-                <button class="edit-btn" title="Edit Message">✏️</button>
-                <button class="delete-btn" title="Delete Message">🗑️</button>
+                <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
+                <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
               `;
               messageContent.appendChild(messageActions);
 
@@ -738,8 +774,8 @@ function sendMessage() {
         const messageActions = document.createElement('div');
         messageActions.className = 'message-actions';
         messageActions.innerHTML = `
-          <button class="edit-btn" title="Edit Message">✏️</button>
-          <button class="delete-btn" title="Delete Message">🗑️</button>
+          <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
+          <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
         `;
         messageContent.appendChild(messageActions);
 
@@ -821,20 +857,15 @@ function initContactSettings() {
     modal.innerHTML = `
       <div class="modal-content">
         <span class="close-modal">&times;</span>
-        <h2>Contact Settings</h2>
         <div id="contact-settings-error" class="error-message"></div>
         <input type="hidden" id="contact-id">
-        <div class="form-group">
-          <label for="contact-username">Username</label>
-          <input type="text" id="contact-username" disabled>
+        <div class="username-header">
+          <p>Username: <span id="contact-username"></span></p>
         </div>
-        <div class="form-group">
-          <label for="contact-display-name-edit">Display Name</label>
-          <input type="text" id="contact-display-name-edit" placeholder="Display name">
-        </div>
+        <input type="text" id="contact-display-name-edit" placeholder="Bekbolsun AIT" class="form-input">
         <div class="modal-actions">
           <button id="update-contact" class="btn primary">Update</button>
-          <button id="delete-contact" class="btn danger">Delete Contact</button>
+          <button id="delete-contact" class="btn danger">Delete</button>
         </div>
       </div>
     `;
@@ -872,7 +903,7 @@ function openContactSettings(contactId, username, displayName) {
 
   const modal = document.getElementById("contact-settings-modal");
   const contactIdInput = document.getElementById("contact-id");
-  const usernameInput = document.getElementById("contact-username");
+  const usernameSpan = document.getElementById("contact-username");
   const displayNameInput = document.getElementById("contact-display-name-edit");
   const errorMsg = document.getElementById("contact-settings-error");
 
@@ -881,7 +912,7 @@ function openContactSettings(contactId, username, displayName) {
 
   // Set current contact values
   contactIdInput.value = contactId;
-  usernameInput.value = username;
+  usernameSpan.textContent = username;
   displayNameInput.value = displayName || "";
 
   // Show modal
@@ -989,6 +1020,22 @@ function initGroupModals() {
   if (!document.getElementById("add-to-group-modal")) {
     createAddToGroupModalElement();
   }
+
+  // Скрываем все модальные окна при инициализации
+  const modals = [
+    "create-group-modal",
+    "group-settings-modal",
+    "add-to-group-modal",
+    "add-contact-modal",
+    "contact-settings-modal"
+  ];
+
+  modals.forEach(modalId => {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = "none";
+    }
+  });
 }
 
 // Create the create group modal element
@@ -996,6 +1043,7 @@ function createGroupModalElement() {
   const modal = document.createElement('div');
   modal.id = "create-group-modal";
   modal.className = "modal";
+  modal.style.display = "none"; // Явно скрываем при создании
 
   modal.innerHTML = `
     <div class="modal-content">
@@ -1016,18 +1064,12 @@ function createGroupModalElement() {
   const closeButton = modal.querySelector(".close-modal");
   closeButton.addEventListener("click", function () {
     modal.style.display = "none";
-    document.getElementById("create-group-error").textContent = "";
   });
-
-  // Create group button
-  const createButton = document.getElementById("create-group-btn");
-  createButton.addEventListener("click", createGroup);
 
   // Close modal when clicking outside
   window.addEventListener("click", function (event) {
     if (event.target === modal) {
       modal.style.display = "none";
-      document.getElementById("create-group-error").textContent = "";
     }
   });
 }
@@ -1037,21 +1079,24 @@ function createGroupSettingsModalElement() {
   const modal = document.createElement('div');
   modal.id = "group-settings-modal";
   modal.className = "modal";
+  modal.style.display = "none"; // Явно скрываем при создании
 
   modal.innerHTML = `
     <div class="modal-content">
-      <span class="close-modal">&times;</span>
-      <h2>Group Settings</h2>
+      <div class="search-header">
+        <input type="text" id="group-name-edit" class="form-input" placeholder="AIT 2024">
+        <span class="close-modal">&times;</span>
+      </div>
       <div id="group-settings-error" class="error-message"></div>
       
       <!-- Admin view -->
       <div id="admin-settings" style="display: none;">
-        <div class="form-group">
-          <label for="group-name-edit">Group Name</label>
-          <input type="text" id="group-name-edit" class="form-input">
+        <div class="add-contact-btn-wrapper">
+          <div class="add-contact-header">
+            <img src="/static/images/add-contact.png" alt="" class="add-contact-icon">
+            <span>Add contact</span>
+          </div>
         </div>
-        <button id="add-to-group-btn" class="btn">Add Contact</button>
-        <h3>Members</h3>
         <div id="group-members-list" class="members-list">
           <div class="loading">Loading members...</div>
         </div>
@@ -1084,10 +1129,12 @@ function createGroupSettingsModalElement() {
   });
 
   // Add contacts to group button
-  const addToGroupBtn = document.getElementById("add-to-group-btn");
-  addToGroupBtn.addEventListener("click", function () {
-    openAddToGroupModal(currentGroup);
-  });
+  const addToGroupHeader = document.querySelector(".add-contact-header");
+  if (addToGroupHeader) {
+    addToGroupHeader.addEventListener("click", function () {
+      openAddToGroupModal(currentGroup);
+    });
+  }
 
   // Update group button
   const updateGroupBtn = document.getElementById("update-group-btn");
@@ -1110,19 +1157,24 @@ function createGroupSettingsModalElement() {
   });
 }
 
-// Create the add contacts to group modal element
+// Create the add contact to group modal element
 function createAddToGroupModalElement() {
   const modal = document.createElement('div');
   modal.id = "add-to-group-modal";
   modal.className = "modal";
+  modal.style.display = "none"; // Явно скрываем при создании
 
   modal.innerHTML = `
     <div class="modal-content">
-      <span class="close-modal">&times;</span>
-      <h2>Add Contact to Group</h2>
+      <div class="search-header">
+        <div class="search-input-container">
+          <img src="/static/images/search.png" class="search-icon" alt="">
+          <input type="text" id="contact-search" placeholder="Find contact" class="form-input">
+        </div>
+        <span class="close-modal">&times;</span>
+      </div>
       <div id="add-to-group-error" class="error-message"></div>
       <input type="hidden" id="target-group-id">
-      <input type="text" id="contact-search" placeholder="Find contact" class="form-input">
       <div id="contacts-to-add" class="contacts-list">
         <div class="loading">Loading contacts...</div>
       </div>
@@ -1183,39 +1235,100 @@ function openCreateGroupModal() {
 }
 
 // Load contacts for group creation or adding to a group
-function loadContactsForSelection(containerElement) {
+function loadContactsForSelection(containerElement, isAddToGroup = false) {
   containerElement.innerHTML = '<div class="loading">Loading contacts...</div>';
 
-  fetch('/api/contacts')
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        if (data.contacts.length === 0) {
-          containerElement.innerHTML = '<div class="no-results">No contacts available</div>';
+  if (isAddToGroup) {
+    // Получаем ID группы, для которой добавляем контакты
+    const groupId = document.getElementById("target-group-id").value;
+    
+    // Сначала получаем членов группы
+    fetch(`/api/groups/${groupId}`)
+      .then(response => response.json())
+      .then(groupData => {
+        if (groupData.success) {
+          const groupMemberIds = groupData.group.members.map(member => member.id);
+          
+          // Затем получаем все контакты и фильтруем тех, кто уже в группе
+          fetch('/api/contacts')
+            .then(response => response.json())
+            .then(contactsData => {
+              if (contactsData.success) {
+                if (contactsData.contacts.length === 0) {
+                  containerElement.innerHTML = '<div class="no-results">Нет доступных контактов</div>';
+                } else {
+                  // Фильтруем контакты, которых еще нет в группе
+                  const availableContacts = contactsData.contacts.filter(contact => 
+                    !groupMemberIds.includes(contact.id)
+                  );
+                  
+                  if (availableContacts.length === 0) {
+                    containerElement.innerHTML = '<div class="no-results">Все контакты уже в группе</div>';
+                  } else {
+                    containerElement.innerHTML = '';
+                    
+                    availableContacts.forEach(contact => {
+                      const contactItem = document.createElement('div');
+                      contactItem.className = 'contact-item';
+                      
+                      contactItem.innerHTML = `
+                        <label class="checkbox-container">
+                          <input type="checkbox" value="${contact.id}">
+                          <span class="checkbox-label">${contact.display_name || contact.username}</span>
+                        </label>
+                      `;
+                      
+                      containerElement.appendChild(contactItem);
+                    });
+                  }
+                }
+              } else {
+                containerElement.innerHTML = '<div class="error">Не удалось загрузить контакты</div>';
+              }
+            })
+            .catch(error => {
+              containerElement.innerHTML = '<div class="error">Не удалось загрузить контакты</div>';
+            });
         } else {
-          containerElement.innerHTML = '';
-
-          data.contacts.forEach(contact => {
-            const contactItem = document.createElement('div');
-            contactItem.className = 'contact-item';
-
-            contactItem.innerHTML = `
-              <label class="checkbox-container">
-                <input type="checkbox" value="${contact.id}" data-username="${contact.username}">
-                <span class="checkbox-label">${contact.display_name || contact.username}</span>
-              </label>
-            `;
-
-            containerElement.appendChild(contactItem);
-          });
+          containerElement.innerHTML = '<div class="error">Не удалось загрузить информацию о группе</div>';
         }
-      } else {
-        containerElement.innerHTML = '<div class="error">Failed to load contacts</div>';
-      }
-    })
-    .catch(error => {
-      containerElement.innerHTML = '<div class="error">Failed to load contacts</div>';
-    });
+      })
+      .catch(error => {
+        containerElement.innerHTML = '<div class="error">Не удалось загрузить информацию о группе</div>';
+      });
+  } else {
+    // Стандартное отображение контактов для других случаев (создание группы)
+    fetch('/api/contacts')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          if (data.contacts.length === 0) {
+            containerElement.innerHTML = '<div class="no-results">Нет доступных контактов</div>';
+          } else {
+            containerElement.innerHTML = '';
+            
+            data.contacts.forEach(contact => {
+              const contactItem = document.createElement('div');
+              contactItem.className = 'contact-item';
+              
+              contactItem.innerHTML = `
+                <label class="checkbox-container">
+                  <input type="checkbox" value="${contact.id}" data-username="${contact.username}">
+                  <span class="checkbox-label">${contact.display_name || contact.username}</span>
+                </label>
+              `;
+              
+              containerElement.appendChild(contactItem);
+            });
+          }
+        } else {
+          containerElement.innerHTML = '<div class="error">Не удалось загрузить контакты</div>';
+        }
+      })
+      .catch(error => {
+        containerElement.innerHTML = '<div class="error">Не удалось загрузить контакты</div>';
+      });
+  }
 }
 
 // Filter contacts list based on search input
@@ -1329,7 +1442,12 @@ function openGroupSettings(groupId) {
             memberItem.innerHTML = `
               <label class="checkbox-container ${isCheckable ? '' : 'disabled'}">
                 <input type="checkbox" value="${member.id}" ${isCheckable ? '' : 'disabled'}>
-                <span class="checkbox-label">${member.username} ${isAdmin ? '(Admin)' : ''} ${isCreator ? '(Creator)' : ''} ${isSelf ? '(You)' : ''}</span>
+                <span class="checkbox-label">
+                  ${member.username} 
+                  ${isAdmin ? '<span class="member-role">(Admin)</span>' : ''} 
+                  ${isCreator ? '<span class="member-role">(Creator)</span>' : ''} 
+                  ${isSelf ? '<span class="member-role">(You)</span>' : ''}
+                </span>
               </label>
             `;
 
@@ -1386,6 +1504,7 @@ function openAddToGroupModal(groupId) {
 
   const modal = document.getElementById("add-to-group-modal");
   const errorMsg = document.getElementById("add-to-group-error");
+  const contactsContainer = document.getElementById("contacts-to-add");
 
   // Reset error message
   errorMsg.textContent = "";
@@ -1396,61 +1515,11 @@ function openAddToGroupModal(groupId) {
   // Clear search input
   document.getElementById("contact-search").value = "";
 
-  // Load contacts that are not already in the group
-  fetch(`/api/groups/${groupId}`)
-    .then(response => response.json())
-    .then(groupData => {
-      if (groupData.success) {
-        const groupMemberIds = groupData.group.members.map(member => member.id);
+  // Загружаем демонстрационные контакты (как на фото)
+  loadContactsForSelection(contactsContainer, true);
 
-        // Now fetch all contacts
-        fetch('/api/contacts')
-          .then(response => response.json())
-          .then(contactsData => {
-            if (contactsData.success) {
-              const contactsContainer = document.getElementById("contacts-to-add");
-
-              // Filter out contacts that are already in the group
-              const availableContacts = contactsData.contacts.filter(contact =>
-                !groupMemberIds.includes(contact.id)
-              );
-
-              if (availableContacts.length === 0) {
-                contactsContainer.innerHTML = '<div class="no-results">All contacts are already in this group</div>';
-              } else {
-                contactsContainer.innerHTML = '';
-
-                availableContacts.forEach(contact => {
-                  const contactItem = document.createElement('div');
-                  contactItem.className = 'contact-item';
-
-                  contactItem.innerHTML = `
-                    <label class="checkbox-container">
-                      <input type="checkbox" value="${contact.id}">
-                      <span class="checkbox-label">${contact.display_name || contact.username}</span>
-                    </label>
-                  `;
-
-                  contactsContainer.appendChild(contactItem);
-                });
-              }
-
-              // Show modal
-              modal.style.display = "block";
-            } else {
-              errorMsg.textContent = contactsData.message || "Failed to load contacts";
-            }
-          })
-          .catch(error => {
-            errorMsg.textContent = "Failed to load contacts. Please try again.";
-          });
-      } else {
-        errorMsg.textContent = groupData.message || "Failed to load group details";
-      }
-    })
-    .catch(error => {
-      errorMsg.textContent = "Failed to load group details. Please try again.";
-    });
+  // Показываем модальное окно
+  modal.style.display = "block";
 }
 
 // Add selected contacts to a group
@@ -1683,33 +1752,24 @@ function openEditMessageModal(messageId, messageText) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'edit-message-modal';
-    modal.className = 'edit-message-modal';
+    modal.className = 'modal';
     modal.innerHTML = `
-      <div class="edit-message-content">
-        <div class="edit-message-header">
-          <h3>Edit Message</h3>
-          <button class="close-modal-btn">&times;</button>
-        </div>
-        <textarea id="edit-message-input" class="edit-message-input"></textarea>
-        <div class="button-container">
-          <button class="cancel-btn">Cancel</button>
-          <button class="save-btn">Save</button>
-        </div>
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Edit message</h2>
+        <input type="text" id="edit-message-input" class="form-input">
+        <button id="save-edit-btn" class="btn primary full-width">Edit</button>
       </div>
     `;
     document.body.appendChild(modal);
     
     // Add event listeners
-    modal.querySelector('.close-modal-btn').addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-    
-    modal.querySelector('.cancel-btn').addEventListener('click', () => {
+    modal.querySelector('.close-modal').addEventListener('click', function() {
       modal.style.display = 'none';
     });
     
     // Close on click outside the modal content
-    modal.addEventListener('click', (e) => {
+    window.addEventListener('click', function(e) {
       if (e.target === modal) {
         modal.style.display = 'none';
       }
@@ -1721,14 +1781,14 @@ function openEditMessageModal(messageId, messageText) {
   messageInput.value = messageText;
   
   // Update save button action
-  const saveButton = modal.querySelector('.save-btn');
+  const saveButton = modal.querySelector('#save-edit-btn');
   
   // Remove existing event listeners from the save button
   const newSaveButton = saveButton.cloneNode(true);
   saveButton.parentNode.replaceChild(newSaveButton, saveButton);
   
   // Add new event listener
-  newSaveButton.addEventListener('click', () => {
+  newSaveButton.addEventListener('click', function() {
     const newText = messageInput.value.trim();
     if (newText && newText !== messageText) {
       updateMessage(messageId, newText);
@@ -1751,33 +1811,23 @@ function openDeleteMessageModal(messageId) {
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'delete-message-modal';
-    modal.className = 'delete-message-modal';
+    modal.className = 'modal';
     modal.innerHTML = `
-      <div class="delete-message-content">
-        <div class="delete-message-header">
-          <h3>Delete Message</h3>
-          <button class="close-modal-btn">&times;</button>
-        </div>
-        <p>Delete this message?</p>
-        <div class="button-container">
-          <button class="cancel-btn">Cancel</button>
-          <button class="confirm-delete-btn">Delete</button>
-        </div>
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Delete this message?</h2>
+        <button id="delete-btn" class="btn danger full-width">Delete</button>
       </div>
     `;
     document.body.appendChild(modal);
     
     // Add event listeners
-    modal.querySelector('.close-modal-btn').addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-    
-    modal.querySelector('.cancel-btn').addEventListener('click', () => {
+    modal.querySelector('.close-modal').addEventListener('click', function() {
       modal.style.display = 'none';
     });
     
     // Close on click outside the modal content
-    modal.addEventListener('click', (e) => {
+    window.addEventListener('click', function(e) {
       if (e.target === modal) {
         modal.style.display = 'none';
       }
@@ -1785,14 +1835,14 @@ function openDeleteMessageModal(messageId) {
   }
   
   // Update delete button action
-  const deleteButton = modal.querySelector('.confirm-delete-btn');
+  const deleteButton = modal.querySelector('#delete-btn');
   
   // Remove existing event listeners
   const newDeleteButton = deleteButton.cloneNode(true);
   deleteButton.parentNode.replaceChild(newDeleteButton, deleteButton);
   
   // Add new event listener
-  newDeleteButton.addEventListener('click', () => {
+  newDeleteButton.addEventListener('click', function() {
     deleteMessage(messageId);
     modal.style.display = 'none';
   });
