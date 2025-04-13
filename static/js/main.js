@@ -6,21 +6,23 @@ function initUI() {
   initLogout();
   initChat();
   
-  // Инициализируем модальные окна, но не открываем их
+  // Initialize modals but don't show them
   const addContactModal = document.getElementById("add-contact-modal");
   const createGroupModal = document.getElementById("create-group-modal");
-  const groupSettingsModal = document.getElementById("group-settings-modal");
   const contactSettingsModal = document.getElementById("contact-settings-modal");
   const addToGroupModal = document.getElementById("add-to-group-modal");
   
-  // Скрываем все модальные окна при инициализации
+  // Hide standard modals
   if (addContactModal) addContactModal.style.display = "none";
   if (createGroupModal) createGroupModal.style.display = "none";
-  if (groupSettingsModal) groupSettingsModal.style.display = "none";
   if (contactSettingsModal) contactSettingsModal.style.display = "none";
   if (addToGroupModal) addToGroupModal.style.display = "none";
 
-  // Инициализируем обработчики событий для модальных окон
+  // Special handling for group settings modal
+  const groupSettingsModal = document.getElementById("group-settings-modal");
+  if (groupSettingsModal) groupSettingsModal.classList.remove("show");
+
+  // Initialize event handlers for modals
   initAddContactModal();
   initContactSettings();
   initGroupModals();
@@ -1021,10 +1023,9 @@ function initGroupModals() {
     createAddToGroupModalElement();
   }
 
-  // Скрываем все модальные окна при инициализации
+  // Hide all modals on initialization
   const modals = [
     "create-group-modal",
-    "group-settings-modal",
     "add-to-group-modal",
     "add-contact-modal",
     "contact-settings-modal"
@@ -1036,6 +1037,12 @@ function initGroupModals() {
       modal.style.display = "none";
     }
   });
+
+  // Special handling for group settings modal since it uses classes
+  const groupSettingsModal = document.getElementById("group-settings-modal");
+  if (groupSettingsModal) {
+    groupSettingsModal.classList.remove("show");
+  }
 }
 
 // Create the create group modal element
@@ -1076,10 +1083,16 @@ function createGroupModalElement() {
 
 // Create the group settings modal element
 function createGroupSettingsModalElement() {
+  // Remove existing modal if it exists
+  const existingModal = document.getElementById("group-settings-modal");
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
   const modal = document.createElement('div');
   modal.id = "group-settings-modal";
   modal.className = "modal";
-  modal.style.display = "none";
+  // No need to set style.display here as it's handled by CSS
 
   modal.innerHTML = `
     <div class="modal-content">
@@ -1149,7 +1162,7 @@ function createGroupSettingsModalElement() {
   // Leave group button
   const leaveGroupBtn = modal.querySelector("#leave-group-btn");
   if (leaveGroupBtn) {
-    leaveGroupBtn.addEventListener("click", leaveGroup);
+  leaveGroupBtn.addEventListener("click", leaveGroup);
   }
 
   // Close modal when clicking outside
@@ -1172,7 +1185,12 @@ function createGroupSettingsModalElement() {
 function showGroupSettingsModal() {
   const modal = document.getElementById("group-settings-modal");
   if (modal) {
+    // First remove any inline styles that might be interfering
+    modal.style = "";
+    // Then add the show class
     modal.classList.add("show");
+    // Force the browser to redraw the modal to ensure it's displayed correctly
+    void modal.offsetHeight;
   }
 }
 
@@ -1180,7 +1198,9 @@ function showGroupSettingsModal() {
 function hideGroupSettingsModal() {
   const modal = document.getElementById("group-settings-modal");
   if (modal) {
+    // Remove the show class
     modal.classList.remove("show");
+    // Clear any error messages
     const errorMsg = document.getElementById("group-settings-error");
     if (errorMsg) {
       errorMsg.textContent = "";
@@ -1288,7 +1308,7 @@ function openGroupSettings(groupId) {
     })
     .catch(error => {
       alert("Failed to load group details. Please try again.");
-    });
+  });
 }
 
 // Create the add contact to group modal element
@@ -1595,7 +1615,7 @@ function updateGroup() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh groups
-        document.getElementById("group-settings-modal").style.display = "none";
+        hideGroupSettingsModal();
         errorMsg.textContent = "";
 
         // Reload groups to show updates
@@ -1633,7 +1653,7 @@ function deleteGroup() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh groups
-        document.getElementById("group-settings-modal").style.display = "none";
+        hideGroupSettingsModal();
         errorMsg.textContent = "";
 
         // Clear current group if this was it
@@ -1685,7 +1705,7 @@ function leaveGroup() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh groups
-        document.getElementById("group-settings-modal").style.display = "none";
+        hideGroupSettingsModal();
         errorMsg.textContent = "";
 
         // Clear current group if this was it
