@@ -1079,7 +1079,7 @@ function createGroupSettingsModalElement() {
   const modal = document.createElement('div');
   modal.id = "group-settings-modal";
   modal.className = "modal";
-  modal.style.display = "none"; // Явно скрываем при создании
+  modal.style.display = "none";
 
   modal.innerHTML = `
     <div class="modal-content">
@@ -1123,38 +1123,172 @@ function createGroupSettingsModalElement() {
 
   // Close button event
   const closeButton = modal.querySelector(".close-modal");
-  closeButton.addEventListener("click", function () {
-    modal.style.display = "none";
-    document.getElementById("group-settings-error").textContent = "";
+  closeButton.addEventListener("click", function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    hideGroupSettingsModal();
   });
 
   // Add contacts to group button
-  const addToGroupHeader = document.querySelector(".add-contact-header");
+  const addToGroupHeader = modal.querySelector(".add-contact-header");
   if (addToGroupHeader) {
-    addToGroupHeader.addEventListener("click", function () {
+    addToGroupHeader.addEventListener("click", function() {
+      hideGroupSettingsModal();
       openAddToGroupModal(currentGroup);
     });
   }
 
   // Update group button
-  const updateGroupBtn = document.getElementById("update-group-btn");
+  const updateGroupBtn = modal.querySelector("#update-group-btn");
   updateGroupBtn.addEventListener("click", updateGroup);
 
   // Delete group button
-  const deleteGroupBtn = document.getElementById("delete-group-btn");
+  const deleteGroupBtn = modal.querySelector("#delete-group-btn");
   deleteGroupBtn.addEventListener("click", deleteGroup);
 
   // Leave group button
-  const leaveGroupBtn = document.getElementById("leave-group-btn");
-  leaveGroupBtn.addEventListener("click", leaveGroup);
+  const leaveGroupBtn = modal.querySelector("#leave-group-btn");
+  if (leaveGroupBtn) {
+    leaveGroupBtn.addEventListener("click", leaveGroup);
+  }
 
   // Close modal when clicking outside
-  window.addEventListener("click", function (event) {
+  modal.addEventListener("click", function(event) {
     if (event.target === modal) {
-      modal.style.display = "none";
-      document.getElementById("group-settings-error").textContent = "";
+      hideGroupSettingsModal();
     }
   });
+  
+  // Prevent clicks within modal content from closing the modal
+  const modalContent = modal.querySelector(".modal-content");
+  if (modalContent) {
+    modalContent.addEventListener("click", function(event) {
+      event.stopPropagation();
+    });
+  }
+}
+
+// Show the group settings modal
+function showGroupSettingsModal() {
+  const modal = document.getElementById("group-settings-modal");
+  if (modal) {
+    modal.classList.add("show");
+  }
+}
+
+// Hide the group settings modal
+function hideGroupSettingsModal() {
+  const modal = document.getElementById("group-settings-modal");
+  if (modal) {
+    modal.classList.remove("show");
+    const errorMsg = document.getElementById("group-settings-error");
+    if (errorMsg) {
+      errorMsg.textContent = "";
+    }
+  }
+}
+
+// Open group settings modal
+function openGroupSettings(groupId) {
+  // Initialize modal if it doesn't exist
+  if (!document.getElementById("group-settings-modal")) {
+    createGroupSettingsModalElement();
+  }
+
+  const modal = document.getElementById("group-settings-modal");
+  const errorMsg = document.getElementById("group-settings-error");
+
+  // Reset error message
+  if (errorMsg) {
+    errorMsg.textContent = "";
+  }
+
+  // Fetch group details
+  fetch(`/api/groups/${groupId}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const group = data.group;
+
+        // Determine if user is an admin
+        if (group.is_admin) {
+          // Show admin view
+          document.getElementById("admin-settings").style.display = "block";
+          document.getElementById("member-settings").style.display = "none";
+
+          // Set group name for editing
+          document.getElementById("group-name-edit").value = group.name;
+
+          // Display members with checkboxes for removal
+          const membersContainer = document.getElementById("group-members-list");
+          membersContainer.innerHTML = '';
+
+          group.members.forEach(member => {
+            const memberItem = document.createElement('div');
+            memberItem.className = 'member-item';
+
+            // Determine if this member is an admin
+            const isAdmin = member.is_admin;
+            const isCreator = member.id === group.created_by;
+            const isSelf = member.id === currentUser.id;
+
+            // Don't allow removing creator or self
+            const isCheckable = !isCreator && !isSelf;
+
+            memberItem.innerHTML = `
+              <label class="checkbox-container ${isCheckable ? '' : 'disabled'}">
+                <input type="checkbox" value="${member.id}" ${isCheckable ? '' : 'disabled'}>
+                <span class="checkbox-label">
+                  ${member.username} 
+                  ${isAdmin ? '<span class="member-role">(Admin)</span>' : ''} 
+                  ${isCreator ? '<span class="member-role">(Creator)</span>' : ''} 
+                  ${isSelf ? '<span class="member-role">(You)</span>' : ''}
+                </span>
+              </label>
+            `;
+
+            membersContainer.appendChild(memberItem);
+          });
+        } else {
+          // Show regular member view
+          document.getElementById("admin-settings").style.display = "none";
+          document.getElementById("member-settings").style.display = "block";
+
+          // Display admin info
+          const adminContainer = document.getElementById("group-admin");
+          adminContainer.innerHTML = '';
+
+          const admins = group.members.filter(member => member.is_admin);
+          admins.forEach(admin => {
+            const adminItem = document.createElement('div');
+            adminItem.className = 'admin-item';
+            adminItem.textContent = admin.username;
+            adminContainer.appendChild(adminItem);
+          });
+
+          // Display participants
+          const participantsContainer = document.getElementById("group-participants");
+          participantsContainer.innerHTML = '';
+
+          group.members.forEach(member => {
+            if (!member.is_admin) {
+              const participantItem = document.createElement('div');
+              participantItem.className = 'participant-item';
+              participantItem.textContent = member.username;
+              participantsContainer.appendChild(participantItem);
+            }
+          });
+        }
+
+        // Show modal
+        showGroupSettingsModal();
+      } else {
+        alert("Failed to load group details. Please try again.");
+      }
+    })
+    .catch(error => {
+      alert("Failed to load group details. Please try again.");
+    });
 }
 
 // Create the add contact to group modal element
@@ -1392,134 +1526,6 @@ function createGroup() {
     .catch(error => {
       errorMsg.textContent = "An error occurred. Please try again.";
     });
-}
-
-// Open group settings modal
-function openGroupSettings(groupId) {
-  // Initialize modal if it doesn't exist
-  if (!document.getElementById("group-settings-modal")) {
-    createGroupSettingsModalElement();
-  }
-
-  const modal = document.getElementById("group-settings-modal");
-  const errorMsg = document.getElementById("group-settings-error");
-
-  // Reset error message
-  errorMsg.textContent = "";
-
-  // Fetch group details
-  fetch(`/api/groups/${groupId}`)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        const group = data.group;
-
-        // Determine if user is an admin
-        if (group.is_admin) {
-          // Show admin view
-          document.getElementById("admin-settings").style.display = "block";
-          document.getElementById("member-settings").style.display = "none";
-
-          // Set group name for editing
-          document.getElementById("group-name-edit").value = group.name;
-
-          // Display members with checkboxes for removal
-          const membersContainer = document.getElementById("group-members-list");
-          membersContainer.innerHTML = '';
-
-          group.members.forEach(member => {
-            const memberItem = document.createElement('div');
-            memberItem.className = 'member-item';
-
-            // Determine if this member is an admin
-            const isAdmin = member.is_admin;
-            const isCreator = member.id === group.created_by;
-            const isSelf = member.id === currentUser.id;
-
-            // Don't allow removing creator or self
-            const isCheckable = !isCreator && !isSelf;
-
-            memberItem.innerHTML = `
-              <label class="checkbox-container ${isCheckable ? '' : 'disabled'}">
-                <input type="checkbox" value="${member.id}" ${isCheckable ? '' : 'disabled'}>
-                <span class="checkbox-label">
-                  ${member.username} 
-                  ${isAdmin ? '<span class="member-role">(Admin)</span>' : ''} 
-                  ${isCreator ? '<span class="member-role">(Creator)</span>' : ''} 
-                  ${isSelf ? '<span class="member-role">(You)</span>' : ''}
-                </span>
-              </label>
-            `;
-
-            membersContainer.appendChild(memberItem);
-          });
-        } else {
-          // Show regular member view
-          document.getElementById("admin-settings").style.display = "none";
-          document.getElementById("member-settings").style.display = "block";
-
-          // Display admin info
-          const adminContainer = document.getElementById("group-admin");
-          adminContainer.innerHTML = '';
-
-          const admins = group.members.filter(member => member.is_admin);
-          admins.forEach(admin => {
-            const adminItem = document.createElement('div');
-            adminItem.className = 'admin-item';
-            adminItem.textContent = admin.username;
-            adminContainer.appendChild(adminItem);
-          });
-
-          // Display participants
-          const participantsContainer = document.getElementById("group-participants");
-          participantsContainer.innerHTML = '';
-
-          group.members.forEach(member => {
-            if (!member.is_admin) {
-              const participantItem = document.createElement('div');
-              participantItem.className = 'participant-item';
-              participantItem.textContent = member.username;
-              participantsContainer.appendChild(participantItem);
-            }
-          });
-        }
-
-        // Show modal
-        modal.style.display = "block";
-      } else {
-        alert("Failed to load group details. Please try again.");
-      }
-    })
-    .catch(error => {
-      alert("Failed to load group details. Please try again.");
-    });
-}
-
-// Open add contacts to group modal
-function openAddToGroupModal(groupId) {
-  // Initialize modal if it doesn't exist
-  if (!document.getElementById("add-to-group-modal")) {
-    createAddToGroupModalElement();
-  }
-
-  const modal = document.getElementById("add-to-group-modal");
-  const errorMsg = document.getElementById("add-to-group-error");
-  const contactsContainer = document.getElementById("contacts-to-add");
-
-  // Reset error message
-  errorMsg.textContent = "";
-
-  // Set target group ID
-  document.getElementById("target-group-id").value = groupId;
-
-  // Clear search input
-  document.getElementById("contact-search").value = "";
-
-  // Загружаем демонстрационные контакты (как на фото)
-  loadContactsForSelection(contactsContainer, true);
-
-  // Показываем модальное окно
-  modal.style.display = "block";
 }
 
 // Add selected contacts to a group
@@ -1909,4 +1915,31 @@ function deleteMessage(messageId) {
     .catch(error => {
       alert("Failed to delete message. Please try again.");
     });
+}
+
+// Open add contacts to group modal
+function openAddToGroupModal(groupId) {
+  // Initialize modal if it doesn't exist
+  if (!document.getElementById("add-to-group-modal")) {
+    createAddToGroupModalElement();
+  }
+
+  const modal = document.getElementById("add-to-group-modal");
+  const errorMsg = document.getElementById("add-to-group-error");
+  const contactsContainer = document.getElementById("contacts-to-add");
+
+  // Reset error message
+  errorMsg.textContent = "";
+
+  // Set target group ID
+  document.getElementById("target-group-id").value = groupId;
+
+  // Clear search input
+  document.getElementById("contact-search").value = "";
+
+  // Load contacts for selection
+  loadContactsForSelection(contactsContainer, true);
+
+  // Show modal
+  modal.style.display = "block";
 }
