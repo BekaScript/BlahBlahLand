@@ -786,11 +786,31 @@
   color: white;
 }
 
-/* Стили для модального окна настроек контакта */
+/* Specific styles for contact settings modal */
+#contact-settings-modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2000;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: none;
+}
+
+#contact-settings-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20vh; /* Add padding from the top instead of centering vertically */
+}
+
 #contact-settings-modal .modal-content {
   max-width: 400px;
   border-radius: 15px;
   padding: 15px;
+  position: relative;
+  margin: 0 auto;
 }
 
 .username-header {
@@ -837,7 +857,8 @@
 #group-settings-modal.show {
   display: flex !important;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 20vh; /* Add padding from the top instead of centering vertically */
 }
 
 #group-settings-modal .modal-content {

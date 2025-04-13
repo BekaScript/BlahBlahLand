@@ -93,9 +93,17 @@ function initAIChat() {
   const aiSendButton = document.getElementById("ai-send-button");
   const aiMessageInput = document.getElementById("ai-message-input");
   const aiChatMessages = document.getElementById("ai-chat-messages");
+  const aiButton = document.getElementById("star"); // AI chat button (star icon)
 
   if (!aiSendButton || !aiMessageInput || !aiChatMessages) {
     return;
+  }
+
+  // Add click event handler for the AI button
+  if (aiButton) {
+    aiButton.addEventListener("click", function() {
+      toggleChat();
+    });
   }
 
   aiSendButton.addEventListener("click", sendAiMessage);
@@ -864,7 +872,7 @@ function initContactSettings() {
         <div class="username-header">
           <p>Username: <span id="contact-username"></span></p>
         </div>
-        <input type="text" id="contact-display-name-edit" placeholder="Bekbolsun AIT" class="form-input">
+        <input type="text" id="contact-display-name-edit" placeholder="Display Name" class="form-input">
         <div class="modal-actions">
           <button id="update-contact" class="btn primary">Update</button>
           <button id="delete-contact" class="btn danger">Delete</button>
@@ -876,8 +884,10 @@ function initContactSettings() {
 
     // Close button event
     const closeButton = modal.querySelector(".close-modal");
-    closeButton.addEventListener("click", function () {
-      modal.style.display = "none";
+    closeButton.addEventListener("click", function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      hideContactSettingsModal();
     });
 
     // Update contact button
@@ -889,12 +899,46 @@ function initContactSettings() {
     deleteButton.addEventListener("click", deleteContact);
 
     // Close modal when clicking outside
-    window.addEventListener("click", function (event) {
+    modal.addEventListener("click", function(event) {
       if (event.target === modal) {
-        modal.style.display = "none";
-        document.getElementById("contact-settings-error").textContent = "";
+        hideContactSettingsModal();
       }
     });
+    
+    // Prevent clicks within modal content from closing the modal
+    const modalContent = modal.querySelector(".modal-content");
+    if (modalContent) {
+      modalContent.addEventListener("click", function(event) {
+        event.stopPropagation();
+      });
+    }
+  }
+}
+
+// Show the contact settings modal
+function showContactSettingsModal() {
+  const modal = document.getElementById("contact-settings-modal");
+  if (modal) {
+    // First remove any inline styles that might be interfering
+    modal.style = "";
+    // Then add the show class
+    modal.classList.add("show");
+    // Force the browser to redraw the modal to ensure it's displayed correctly
+    void modal.offsetHeight;
+  }
+}
+
+// Hide the contact settings modal
+function hideContactSettingsModal() {
+  const modal = document.getElementById("contact-settings-modal");
+  if (modal) {
+    // Remove the show class
+    modal.classList.remove("show");
+    // Clear any error messages
+    const errorMsg = document.getElementById("contact-settings-error");
+    if (errorMsg) {
+      errorMsg.textContent = "";
+    }
   }
 }
 
@@ -918,7 +962,7 @@ function openContactSettings(contactId, username, displayName) {
   displayNameInput.value = displayName || "";
 
   // Show modal
-  modal.style.display = "block";
+  showContactSettingsModal();
 
   // Focus on display name input
   displayNameInput.focus();
@@ -943,7 +987,7 @@ function updateContactDisplayName() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh contacts
-        document.getElementById("contact-settings-modal").style.display = "none";
+        hideContactSettingsModal();
         errorMsg.textContent = "";
         loadContacts();
       } else {
@@ -974,7 +1018,7 @@ function deleteContact() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh contacts
-        document.getElementById("contact-settings-modal").style.display = "none";
+        hideContactSettingsModal();
         errorMsg.textContent = "";
         loadContacts();
 
@@ -1073,6 +1117,12 @@ function createGroupModalElement() {
     modal.style.display = "none";
   });
 
+  // Add event listener for create group button
+  const createGroupBtn = modal.querySelector("#create-group-btn");
+  if (createGroupBtn) {
+    createGroupBtn.addEventListener("click", createGroup);
+  }
+
   // Close modal when clicking outside
   window.addEventListener("click", function (event) {
     if (event.target === modal) {
@@ -1096,8 +1146,12 @@ function createGroupSettingsModalElement() {
 
   modal.innerHTML = `
     <div class="modal-content">
-      <div class="search-header">
-        <input type="text" id="group-name-edit" class="form-input" placeholder="AIT 2024">
+      <div class="search-header admin-only">
+        <input type="text" id="group-name-edit" class="form-input" placeholder="Group Name">
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="search-header user-only" style="display: none;">
+        <h3 id="group-name-label">Group Name</h3>
         <span class="close-modal">&times;</span>
       </div>
       <div id="group-settings-error" class="error-message"></div>
@@ -1135,11 +1189,13 @@ function createGroupSettingsModalElement() {
   document.body.appendChild(modal);
 
   // Close button event
-  const closeButton = modal.querySelector(".close-modal");
-  closeButton.addEventListener("click", function(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    hideGroupSettingsModal();
+  const closeButtons = modal.querySelectorAll(".close-modal");
+  closeButtons.forEach(button => {
+    button.addEventListener("click", function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      hideGroupSettingsModal();
+    });
   });
 
   // Add contacts to group button
@@ -1162,7 +1218,7 @@ function createGroupSettingsModalElement() {
   // Leave group button
   const leaveGroupBtn = modal.querySelector("#leave-group-btn");
   if (leaveGroupBtn) {
-  leaveGroupBtn.addEventListener("click", leaveGroup);
+    leaveGroupBtn.addEventListener("click", leaveGroup);
   }
 
   // Close modal when clicking outside
@@ -1235,20 +1291,26 @@ function openGroupSettings(groupId) {
           // Show admin view
           document.getElementById("admin-settings").style.display = "block";
           document.getElementById("member-settings").style.display = "none";
+          
+          // Show admin header, hide user header
+          modal.querySelector(".search-header.admin-only").style.display = "flex";
+          modal.querySelector(".search-header.user-only").style.display = "none";
 
           // Set group name for editing
           document.getElementById("group-name-edit").value = group.name;
 
-          // Display members with checkboxes for removal
+          // Display members with checkboxes for removal, but exclude admins
           const membersContainer = document.getElementById("group-members-list");
           membersContainer.innerHTML = '';
 
-          group.members.forEach(member => {
+          // Filter out admins from the member list
+          const nonAdminMembers = group.members.filter(member => !member.is_admin);
+
+          nonAdminMembers.forEach(member => {
             const memberItem = document.createElement('div');
             memberItem.className = 'member-item';
 
-            // Determine if this member is an admin
-            const isAdmin = member.is_admin;
+            // Determine if this member is a creator or self
             const isCreator = member.id === group.created_by;
             const isSelf = member.id === currentUser.id;
 
@@ -1260,7 +1322,6 @@ function openGroupSettings(groupId) {
                 <input type="checkbox" value="${member.id}" ${isCheckable ? '' : 'disabled'}>
                 <span class="checkbox-label">
                   ${member.username} 
-                  ${isAdmin ? '<span class="member-role">(Admin)</span>' : ''} 
                   ${isCreator ? '<span class="member-role">(Creator)</span>' : ''} 
                   ${isSelf ? '<span class="member-role">(You)</span>' : ''}
                 </span>
@@ -1273,6 +1334,13 @@ function openGroupSettings(groupId) {
           // Show regular member view
           document.getElementById("admin-settings").style.display = "none";
           document.getElementById("member-settings").style.display = "block";
+          
+          // Show user header, hide admin header
+          modal.querySelector(".search-header.admin-only").style.display = "none";
+          modal.querySelector(".search-header.user-only").style.display = "flex";
+          
+          // Set group name label
+          document.getElementById("group-name-label").textContent = group.name;
 
           // Display admin info
           const adminContainer = document.getElementById("group-admin");
