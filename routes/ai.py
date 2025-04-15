@@ -23,11 +23,11 @@ def ai_chat():
             headers={
                 "Authorization": f"Bearer {current_app.config['OPENROUTER_API_KEY']}",
                 "Content-Type": "application/json",
-                # "HTTP-Referer": "https://blahblahland.com", # You can update this
+                "HTTP-Referer": "https://blahblahland.onrender.com", # You can update this
                 "X-Title": "BlahBlahLand", # You can update this
             },
             json={
-                "model": "google/gemma-3-27b-it:free",
+                "model": "moonshotai/kimi-vl-a3b-thinking:free",
                 "messages": [
                     {
                         "role": "system",
