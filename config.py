@@ -17,4 +17,4 @@ class Config:
     MAIL_DEFAULT_SENDER = ('BlahBlahLand', 'bekbolsunysmanov07@gmail.com')
     
     # AI API configuration
-    OPENROUTER_API_KEY = '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'
+    OPENROUTER_API_KEY = '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'
