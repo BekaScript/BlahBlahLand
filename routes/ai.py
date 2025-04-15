@@ -27,7 +27,7 @@ def ai_chat():
                 "X-Title": "BlahBlahLand", # You can update this
             },
             json={
-                "model": "moonshotai/kimi-vl-a3b-thinking:free",
+                "model": "google/gemini-2.5-pro-exp-03-25:free",
                 "messages": [
                     {
                         "role": "system",
