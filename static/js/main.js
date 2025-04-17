@@ -168,10 +168,6 @@ function initAIChat() {
         const aiMessageDiv = document.createElement("div");
         aiMessageDiv.className = "ai-message";
         
-        // Create the AI response content wrapper
-        const aiContentWrapper = document.createElement("div");
-        aiContentWrapper.className = "ai-content-wrapper";
-        
         // Add the AI message text
         const aiTextElement = document.createElement("div");
         aiTextElement.className = "ai-text";
@@ -186,7 +182,7 @@ function initAIChat() {
         // Add copy button
         const copyButton = document.createElement("button");
         copyButton.className = "copy-btn";
-        copyButton.innerHTML = "📋";
+        copyButton.innerHTML = '<img src="/static/images/copy-icon.png" alt="Copy" class="copy-icon">';
         copyButton.title = "Copy to clipboard";
         
         // Add event listener to copy button
@@ -195,12 +191,11 @@ function initAIChat() {
           navigator.clipboard.writeText(textToCopy)
             .then(() => {
               // Temporarily change button to indicate success
-              const originalContent = copyButton.innerHTML;
               copyButton.innerHTML = "✓";
               copyButton.classList.add("copied");
               
               setTimeout(() => {
-                copyButton.innerHTML = originalContent;
+                copyButton.innerHTML = '<img src="/static/images/copy-icon.png" alt="Copy" class="copy-icon">';
                 copyButton.classList.remove("copied");
               }, 1500);
             })
@@ -210,10 +205,9 @@ function initAIChat() {
             });
         });
         
-        // Append elements to the DOM
-        aiContentWrapper.appendChild(aiTextElement);
-        aiContentWrapper.appendChild(copyButton);
-        aiMessageDiv.appendChild(aiContentWrapper);
+        // Append elements directly to message div without wrapper
+        aiMessageDiv.appendChild(aiTextElement);
+        aiMessageDiv.appendChild(copyButton);
         aiChatMessages.appendChild(aiMessageDiv);
 
         // Scroll to bottom
@@ -229,10 +223,6 @@ function initAIChat() {
         const aiMessageDiv = document.createElement("div");
         aiMessageDiv.className = "ai-message error";
         
-        // Create content wrapper for the error message
-        const aiContentWrapper = document.createElement("div");
-        aiContentWrapper.className = "ai-content-wrapper";
-        
         // Add the error text
         const aiTextElement = document.createElement("div");
         aiTextElement.className = "ai-text";
@@ -241,7 +231,7 @@ function initAIChat() {
         // Add copy button
         const copyButton = document.createElement("button");
         copyButton.className = "copy-btn";
-        copyButton.innerHTML = "📋";
+        copyButton.innerHTML = '<img src="/static/images/copy-icon.png" alt="Copy" class="copy-icon">'; 
         copyButton.title = "Copy to clipboard";
         
         // Add event listener to copy button
@@ -250,12 +240,11 @@ function initAIChat() {
           navigator.clipboard.writeText(textToCopy)
             .then(() => {
               // Temporarily change button to indicate success
-              const originalContent = copyButton.innerHTML;
               copyButton.innerHTML = "✓";
               copyButton.classList.add("copied");
               
               setTimeout(() => {
-                copyButton.innerHTML = originalContent;
+                copyButton.innerHTML = '<img src="/static/images/copy-icon.png" alt="Copy" class="copy-icon">';
                 copyButton.classList.remove("copied");
               }, 1500);
             })
@@ -265,10 +254,9 @@ function initAIChat() {
             });
         });
         
-        // Append elements to the DOM
-        aiContentWrapper.appendChild(aiTextElement);
-        aiContentWrapper.appendChild(copyButton);
-        aiMessageDiv.appendChild(aiContentWrapper);
+        // Append elements directly to message div without wrapper
+        aiMessageDiv.appendChild(aiTextElement);
+        aiMessageDiv.appendChild(copyButton);
         aiChatMessages.appendChild(aiMessageDiv);
         
         // Scroll to bottom

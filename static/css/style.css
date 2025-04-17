@@ -471,21 +471,33 @@
   word-wrap: break-word;
 }
 
+.copy-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
 .copy-btn {
   background: none;
   border: none;
   cursor: pointer;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f5f5;
+  background-color: #f0f0f0;
   font-size: 16px;
   margin-left: 8px;
   flex-shrink: 0;
   transition: all 0.2s ease;
+  position: absolute;
+  right: -35px;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .copy-btn:hover {
@@ -1013,4 +1025,11 @@
     height: 2px;
     background-color: #000;
     margin: 2px 0;
+}
+
+/* Add a class for AI messages to support the copy button positioning */
+.ai-message {
+  position: relative;
+  padding-right: 20px;
+  margin-right: 20px;
 }
