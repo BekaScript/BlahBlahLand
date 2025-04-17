@@ -461,10 +461,11 @@ function loadContacts() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        if (data.contacts.length === 0) {
-          usersList.innerHTML = '<li class="no-results">No contacts yet</li>';
-        } else {
-          usersList.innerHTML = '';
+        // Clear the loading message
+        usersList.innerHTML = '';
+        
+        // Add contacts if any exist
+        if (data.contacts.length > 0) {
           data.contacts.forEach(contact => {
             const contactItem = document.createElement('li');
             contactItem.className = 'user';
@@ -486,10 +487,13 @@ function loadContacts() {
 
             usersList.appendChild(contactItem);
           });
-
-          // Also load groups
-          loadGroups();
         }
+        
+        // Always load groups regardless of whether there are contacts
+        loadGroups();
+        
+        // Only show "No contacts or groups" if both contacts and groups are empty
+        // This will be checked and updated in the loadGroups function
       } else {
         usersList.innerHTML = '<li class="error">Failed to load contacts</li>';
       }
@@ -514,35 +518,48 @@ function loadGroups() {
   fetch('/api/groups')
     .then(response => response.json())
     .then(data => {
-      if (data.success && data.groups && data.groups.length > 0) {
+      if (data.success) {
+        if (data.groups && data.groups.length > 0) {
+          // Add groups to the list
+          data.groups.forEach(group => {
+            const groupItem = document.createElement('li');
+            groupItem.className = 'user group';
+            groupItem.setAttribute('data-id', group.id);
+            groupItem.setAttribute('data-type', 'group');
+            groupItem.setAttribute('data-name', group.name);
+            groupItem.setAttribute('data-is-admin', group.is_admin);
 
-        data.groups.forEach(group => {
-          const groupItem = document.createElement('li');
-          groupItem.className = 'user group';
-          groupItem.setAttribute('data-id', group.id);
-          groupItem.setAttribute('data-type', 'group');
-          groupItem.setAttribute('data-name', group.name);
-          groupItem.setAttribute('data-is-admin', group.is_admin);
+            groupItem.innerHTML = `
+              <div class="user-info">
+                <div class="user-name">${group.name}</div>
+                <div class="last-message">${group.last_message || ''}</div>
+              </div>
+            `;
 
-          groupItem.innerHTML = `
-            <div class="user-info">
-              <div class="user-name">${group.name}</div>
-              <div class="last-message">${group.last_message || ''}</div>
-            </div>
-          `;
+            groupItem.addEventListener('click', function () {
+              openChat(group.id, 'group', group.name);
+            });
 
-          groupItem.addEventListener('click', function () {
-            openChat(group.id, 'group', group.name);
+            usersList.appendChild(groupItem);
           });
-
-          usersList.appendChild(groupItem);
-        });
-      } else if (!data.success) {
-        // Error handling for loading groups
+        }
+        
+        // If both contacts and groups are empty, show "No contacts or groups" message
+        if (usersList.children.length === 0) {
+          usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
+        }
+      } else {
+        // Only show error if there are no items at all
+        if (usersList.children.length === 0) {
+          usersList.innerHTML = '<li class="error">Failed to load groups</li>';
+        }
       }
     })
     .catch(error => {
-      // Error handling for group request
+      // Only show error if there are no items at all
+      if (usersList.children.length === 0) {
+        usersList.innerHTML = '<li class="error">Failed to load groups</li>';
+      }
     });
 }
 
