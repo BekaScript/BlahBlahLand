@@ -1,4 +1,4 @@
-from app import create_app
+from app import create_app, socketio
 
 # Create application instance
 application = create_app()
@@ -7,4 +7,4 @@ application = create_app()
 app = application
 
 if __name__ == "__main__":
-    application.run() 
+    socketio.run(application) 

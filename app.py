@@ -1,5 +1,7 @@
 import os
 import sys
+import eventlet
+eventlet.monkey_patch()
 
 # Add the current directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -19,7 +21,7 @@ from routes.groups import groups as groups_blueprint
 from routes.ai import ai as ai_blueprint
 
 # Initialize Flask-SocketIO
-socketio = SocketIO()
+socketio = SocketIO(async_mode='eventlet')
 
 def create_app(config_class=Config):
     # Initialize Flask app
@@ -59,4 +61,4 @@ def create_app(config_class=Config):
 
 if __name__ == '__main__':
     app = create_app()
-    socketio.run(app, debug=True, port=5001, host='0.0.0.0')
+    socketio.run(app, debug=True, port=8000, host='0.0.0.0')
