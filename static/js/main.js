@@ -27,11 +27,149 @@ function initUI() {
   initContactSettings();
   initGroupModals();
 
+  // Initialize WebSocket connection
+  initWebSocket();
+
   // Check if user is logged in
   checkLoginStatus();
 }
 
 document.addEventListener("DOMContentLoaded", initUI);
+
+// WebSocket connection
+let socket = null;
+
+function initWebSocket() {
+  // Create socket connection
+  socket = io();
+
+  // Connection events
+  socket.on('connect', function() {
+    console.log('WebSocket connected');
+  });
+
+  socket.on('disconnect', function() {
+    console.log('WebSocket disconnected');
+  });
+
+  // Message events
+  socket.on('new_message', function(data) {
+    // Handle incoming message
+    displayNewMessage(data);
+  });
+
+  // List update events
+  socket.on('contacts_list', function(data) {
+    if (data.success) {
+      displayContacts(data.contacts);
+    }
+  });
+
+  socket.on('groups_list', function(data) {
+    if (data.success) {
+      displayGroups(data.groups);
+    }
+  });
+
+  // Trigger to request updated lists
+  socket.on('trigger_update_lists', function() {
+    requestListUpdates();
+  });
+}
+
+// Request updated contacts and groups lists
+function requestListUpdates() {
+  if (socket && socket.connected) {
+    socket.emit('update_lists');
+  }
+}
+
+// Display a new incoming message
+function displayNewMessage(message) {
+  // Only process if this is for the current chat
+  if ((currentContact && message.sender_id == currentContact) || 
+      (currentContact && message.receiver_id == currentContact) ||
+      (currentGroup && message.group_id == currentGroup)) {
+    
+    const messagesContainer = document.getElementById("messages");
+    if (!messagesContainer) return;
+    
+    // Check if the message already exists
+    if (document.querySelector(`.message[data-id="${message.id}"]`)) {
+      return; // Skip if already displayed
+    }
+    
+    // Create message element
+    const messageDiv = document.createElement('div');
+    messageDiv.className = message.is_own_message ? 'message own' : 'message';
+    messageDiv.setAttribute('data-id', message.id);
+    
+    // Add read class if applicable
+    if (message.is_own_message && message.read_by && message.read_by.length > 0) {
+      messageDiv.classList.add('read');
+    }
+    
+    // Create message content
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    
+    // Add action buttons for own messages
+    if (message.is_own_message) {
+      const messageActions = document.createElement('div');
+      messageActions.className = 'message-actions';
+      messageActions.innerHTML = `
+        <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
+        <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
+      `;
+      messageContent.appendChild(messageActions);
+      
+      // Add event listeners
+      messageActions.querySelector('.edit-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        openEditMessageModal(message.id, message.message);
+      });
+      
+      messageActions.querySelector('.delete-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        openDeleteMessageModal(message.id);
+      });
+    }
+    
+    // Add sender name for group messages
+    if (!message.is_own_message && currentGroup) {
+      const senderNameDiv = document.createElement('div');
+      senderNameDiv.className = 'sender-name';
+      senderNameDiv.textContent = message.sender_username;
+      messageContent.appendChild(senderNameDiv);
+    }
+    
+    // Add message text
+    const messageTextDiv = document.createElement('div');
+    messageTextDiv.className = 'message-text';
+    messageTextDiv.textContent = message.message;
+    messageContent.appendChild(messageTextDiv);
+    
+    // Add edited label if needed
+    if (message.edited) {
+      const editedLabel = document.createElement('span');
+      editedLabel.className = 'edited-label';
+      editedLabel.textContent = '(edited)';
+      messageContent.appendChild(editedLabel);
+    }
+    
+    // Add to DOM
+    messageDiv.appendChild(messageContent);
+    messagesContainer.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Mark as read if it's not our own message
+    if (!message.is_own_message) {
+      markMessageAsRead(message.id);
+    }
+  }
+}
 
 // Sidebar menu handling
 function initSidebar() {
@@ -331,14 +469,19 @@ function initAddContactModal() {
       .then(data => {
         console.log("Debug: Contact add response data", data);
         if (data.success) {
-          // Close modal and refresh contacts
+          // Close modal and clear inputs
           modal.style.display = "none";
           contactIdentifier.value = "";
           if (contactDisplayName) contactDisplayName.value = "";
           errorMsg.textContent = "";
 
-          // Reload contacts to show the new contact
-          loadContacts();
+          // Notify about contact change
+          if (data.contact && data.contact.id) {
+            notifyContactChanged(data.contact.id);
+          } else {
+            // Fallback if no contact id is returned
+            requestListUpdates();
+          }
         } else {
           errorMsg.textContent = data.message || "Failed to add contact";
         }
@@ -401,8 +544,13 @@ function checkLoginStatus() {
     .then(data => {
       if (data.success) {
         currentUser = data.user;
-        // Load contacts and messages
-        loadContacts();
+        // Request initial lists
+        if (socket && socket.connected) {
+          requestListUpdates();
+        } else {
+          // Fallback to traditional loading
+          loadContacts();
+        }
       } else {
         // Only redirect if we're not already on the login page
         if (!window.location.pathname.endsWith('/login') &&
@@ -447,7 +595,87 @@ function initChat() {
   sendButton.disabled = true;
 }
 
-// Load contacts
+// Display contacts from data
+function displayContacts(contacts) {
+  const usersList = document.getElementById("users");
+  if (!usersList) return;
+  
+  // Remove existing contacts but keep groups
+  const existingContacts = usersList.querySelectorAll('.user:not(.group)');
+  existingContacts.forEach(item => item.remove());
+  
+  // Add contacts
+  if (contacts.length > 0) {
+    contacts.forEach(contact => {
+      const contactItem = document.createElement('li');
+      contactItem.className = 'user';
+      contactItem.setAttribute('data-id', contact.id);
+      contactItem.setAttribute('data-type', 'contact');
+      contactItem.setAttribute('data-username', contact.username);
+      contactItem.setAttribute('data-display-name', contact.display_name || '');
+
+      contactItem.innerHTML = `
+        <div class="user-info">
+          <div class="user-name">${contact.display_name || contact.username}</div>
+          <div class="last-message">${contact.last_message || ''}</div>
+        </div>
+      `;
+
+      contactItem.addEventListener('click', function () {
+        openChat(contact.id, 'contact', contact.display_name || contact.username);
+      });
+
+      usersList.appendChild(contactItem);
+    });
+  }
+  
+  // If no contacts and no groups, show "no results" message
+  if (usersList.children.length === 0) {
+    usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
+  }
+}
+
+// Display groups from data
+function displayGroups(groups) {
+  const usersList = document.getElementById("users");
+  if (!usersList) return;
+  
+  // Remove existing groups
+  const existingGroups = usersList.querySelectorAll('.user.group');
+  existingGroups.forEach(item => item.remove());
+  
+  // Add groups
+  if (groups && groups.length > 0) {
+    groups.forEach(group => {
+      const groupItem = document.createElement('li');
+      groupItem.className = 'user group';
+      groupItem.setAttribute('data-id', group.id);
+      groupItem.setAttribute('data-type', 'group');
+      groupItem.setAttribute('data-name', group.name);
+      groupItem.setAttribute('data-is-admin', group.is_admin);
+
+      groupItem.innerHTML = `
+        <div class="user-info">
+          <div class="user-name">${group.name}</div>
+          <div class="last-message">${group.last_message || ''}</div>
+        </div>
+      `;
+
+      groupItem.addEventListener('click', function () {
+        openChat(group.id, 'group', group.name);
+      });
+
+      usersList.appendChild(groupItem);
+    });
+  }
+  
+  // If no contacts and no groups, show "no results" message
+  if (usersList.children.length === 0) {
+    usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
+  }
+}
+
+// Load contacts (fallback if WebSockets aren't available)
 function loadContacts() {
   const usersList = document.getElementById("users");
 
@@ -455,45 +683,14 @@ function loadContacts() {
     return;
   }
 
-  usersList.innerHTML = '<li class="loading">Loading contacts...</li>';
 
   fetch('/api/contacts')
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Clear the loading message
-        usersList.innerHTML = '';
-        
-        // Add contacts if any exist
-        if (data.contacts.length > 0) {
-          data.contacts.forEach(contact => {
-            const contactItem = document.createElement('li');
-            contactItem.className = 'user';
-            contactItem.setAttribute('data-id', contact.id);
-            contactItem.setAttribute('data-type', 'contact');
-            contactItem.setAttribute('data-username', contact.username);
-            contactItem.setAttribute('data-display-name', contact.display_name || '');
-
-            contactItem.innerHTML = `
-              <div class="user-info">
-                <div class="user-name">${contact.display_name || contact.username}</div>
-                <div class="last-message">${contact.last_message || ''}</div>
-              </div>
-            `;
-
-            contactItem.addEventListener('click', function () {
-              openChat(contact.id, 'contact', contact.display_name || contact.username);
-            });
-
-            usersList.appendChild(contactItem);
-          });
-        }
-        
-        // Always load groups regardless of whether there are contacts
+        displayContacts(data.contacts);
+        // Also load groups
         loadGroups();
-        
-        // Only show "No contacts or groups" if both contacts and groups are empty
-        // This will be checked and updated in the loadGroups function
       } else {
         usersList.innerHTML = '<li class="error">Failed to load contacts</li>';
       }
@@ -503,7 +700,7 @@ function loadContacts() {
     });
 }
 
-// Load groups
+// Load groups (fallback if WebSockets aren't available)
 function loadGroups() {
   const usersList = document.getElementById("users");
 
@@ -511,7 +708,7 @@ function loadGroups() {
     return;
   }
 
-  // First, remove only existing groups and separators
+  // Remove existing groups
   const existingGroups = usersList.querySelectorAll('.user.group, .separator');
   existingGroups.forEach(item => item.remove());
 
@@ -519,35 +716,7 @@ function loadGroups() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        if (data.groups && data.groups.length > 0) {
-          // Add groups to the list
-          data.groups.forEach(group => {
-            const groupItem = document.createElement('li');
-            groupItem.className = 'user group';
-            groupItem.setAttribute('data-id', group.id);
-            groupItem.setAttribute('data-type', 'group');
-            groupItem.setAttribute('data-name', group.name);
-            groupItem.setAttribute('data-is-admin', group.is_admin);
-
-            groupItem.innerHTML = `
-              <div class="user-info">
-                <div class="user-name">${group.name}</div>
-                <div class="last-message">${group.last_message || ''}</div>
-              </div>
-            `;
-
-            groupItem.addEventListener('click', function () {
-              openChat(group.id, 'group', group.name);
-            });
-
-            usersList.appendChild(groupItem);
-          });
-        }
-        
-        // If both contacts and groups are empty, show "No contacts or groups" message
-        if (usersList.children.length === 0) {
-          usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
-        }
+        displayGroups(data.groups);
       } else {
         // Only show error if there are no items at all
         if (usersList.children.length === 0) {
@@ -615,7 +784,7 @@ function openChat(id, type, name) {
   }, 1000);
 }
 
-// Load messages for the current chat
+// Load messages for current chat
 function loadMessages(id, type) {
   const messagesContainer = document.getElementById("messages");
 
@@ -640,15 +809,15 @@ function loadMessages(id, type) {
           messagesContainer.innerHTML = '';
 
           data.messages.forEach(msg => {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = msg.is_own_message ? 'message own' : 'message';
+            const messageElement = document.createElement('div');
+            messageElement.className = msg.is_own_message ? 'message own' : 'message';
             
             // Add read class only to own messages that have been read by recipients
             if (msg.is_own_message && msg.read_by && msg.read_by.length > 0) {
-              messageDiv.classList.add('read');
+              messageElement.classList.add('read');
             }
             
-            messageDiv.setAttribute('data-id', msg.id);
+            messageElement.setAttribute('data-id', msg.id);
 
             // Create the message content element
             const messageContent = document.createElement('div');
@@ -700,8 +869,8 @@ function loadMessages(id, type) {
             }
 
             // Append the message content to the message div
-            messageDiv.appendChild(messageContent);
-            messagesContainer.appendChild(messageDiv);
+            messageElement.appendChild(messageContent);
+            messagesContainer.appendChild(messageElement);
           });
 
           // Scroll to bottom
@@ -755,10 +924,25 @@ function sendMessage() {
     };
   }
 
-  // Clear and disable input until message is sent
+  // Clear input immediately for responsiveness
   messageInput.value = '';
-  messageInput.disabled = true;
+
+  // Use WebSocket for sending if available
+  if (socket && socket.connected) {
+    socket.emit('send_message', data);
+  } else {
+    // Fallback to traditional API call
+    sendMessageTraditional(data);
+  }
+}
+
+// Traditional API fallback for sending messages
+function sendMessageTraditional(data) {
+  const messageInput = document.getElementById("message-input");
   const sendButton = document.getElementById("send-button");
+  
+  // Disable input until message is sent
+  if (messageInput) messageInput.disabled = true;
   if (sendButton) sendButton.disabled = true;
 
   fetch('/api/messages', {
@@ -771,71 +955,60 @@ function sendMessage() {
     .then(response => response.json())
     .then(data => {
       // Re-enable input
-      messageInput.disabled = false;
+      if (messageInput) messageInput.disabled = false;
       if (sendButton) sendButton.disabled = false;
-      messageInput.focus();
+      if (messageInput) messageInput.focus();
 
       if (data.success) {
         // Create message div for own message
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message own'; // New messages are unread by recipients
-        messageDiv.setAttribute('data-id', data.message.id);
-
-        // Create message content container
-        const messageContent = document.createElement('div');
-        messageContent.className = 'message-content';
-
-        // Add message actions (edit and delete buttons)
-        const messageActions = document.createElement('div');
-        messageActions.className = 'message-actions';
-        messageActions.innerHTML = `
-          <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
-          <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
-        `;
-        messageContent.appendChild(messageActions);
-
-        // Add event listeners for buttons
-        messageActions.querySelector('.edit-btn').addEventListener('click', function(e) {
-          e.stopPropagation();
-          openEditMessageModal(data.message.id, data.message.message);
-        });
-        
-        messageActions.querySelector('.delete-btn').addEventListener('click', function(e) {
-          e.stopPropagation();
-          openDeleteMessageModal(data.message.id);
-        });
-
-        // Add message text
-        const messageTextDiv = document.createElement('div');
-        messageTextDiv.className = 'message-text';
-        messageTextDiv.textContent = data.message.message;
-        messageContent.appendChild(messageTextDiv);
-
-        // Add edited label if needed
-        if (data.message.edited) {
-          const editedLabel = document.createElement('span');
-          editedLabel.className = 'edited-label';
-          editedLabel.textContent = '(edited)';
-          messageContent.appendChild(editedLabel);
-        }
-
-        // Append the message content to the message div
-        messageDiv.appendChild(messageContent);
-        messagesContainer.appendChild(messageDiv);
-
-        // Scroll to bottom
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        displayNewMessage(data.message);
       } else {
         alert("Failed to send message. Please try again.");
       }
     })
     .catch(error => {
       // Re-enable input
-      messageInput.disabled = false;
+      if (messageInput) messageInput.disabled = false;
       if (sendButton) sendButton.disabled = false;
 
       alert("Failed to send message. Please try again.");
     });
+}
+
+// Mark message as read
+function markMessageAsRead(messageId) {
+  fetch(`/api/messages/${messageId}/read`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  }).then(response => response.json())
+    .then(data => {
+      // Optionally handle response
+    })
+    .catch(error => {
+      // Optionally handle error
+    });
+}
+
+// Contact event notifications
+function notifyContactChanged(contactId) {
+  if (socket && socket.connected) {
+    socket.emit('contact_changed', { contact_id: contactId });
+  } else {
+    // Fallback: just reload contacts
+    loadContacts();
+  }
+}
+
+// Group event notifications
+function notifyGroupChanged(groupId) {
+  if (socket && socket.connected) {
+    socket.emit('group_changed', { group_id: groupId });
+  } else {
+    // Fallback: just reload groups
+    loadGroups();
+  }
 }
 
 // Initialize contact settings modal
@@ -991,10 +1164,10 @@ function updateContactDisplayName() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh contacts
+        // Close modal and notify about contact change
         hideContactSettingsModal();
         errorMsg.textContent = "";
-        loadContacts();
+        notifyContactChanged(contactId);
       } else {
         errorMsg.textContent = data.message || "Failed to update contact";
       }
@@ -1022,10 +1195,10 @@ function deleteContact() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh contacts
+        // Close modal and notify about contact change
         hideContactSettingsModal();
         errorMsg.textContent = "";
-        loadContacts();
+        notifyContactChanged(contactId);
 
         // If this was the current chat, clear it
         if (currentContact === parseInt(contactId)) {
@@ -1108,7 +1281,6 @@ function createGroupModalElement() {
       <div id="create-group-error" class="error-message"></div>
       <input type="text" id="group-name" placeholder="Group Name" class="form-input">
       <div class="contacts-list" id="group-contacts-list">
-        <div class="loading">Loading contacts...</div>
       </div>
       <button id="create-group-btn" class="btn primary">Create</button>
     </div>
@@ -1403,7 +1575,6 @@ function createAddToGroupModalElement() {
       <div id="add-to-group-error" class="error-message"></div>
       <input type="hidden" id="target-group-id">
       <div id="contacts-to-add" class="contacts-list">
-        <div class="loading">Loading contacts...</div>
       </div>
       <button id="add-selected-contacts" class="btn primary">Add</button>
     </div>
@@ -1463,7 +1634,6 @@ function openCreateGroupModal() {
 
 // Load contacts for group creation or adding to a group
 function loadContactsForSelection(containerElement, isAddToGroup = false) {
-  containerElement.innerHTML = '<div class="loading">Loading contacts...</div>';
 
   if (isAddToGroup) {
     // Получаем ID группы, для которой добавляем контакты
@@ -1606,12 +1776,10 @@ function createGroup() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh groups
+        // Close modal and notify about group change
         document.getElementById("create-group-modal").style.display = "none";
         errorMsg.textContent = "";
-
-        // Reload groups to show the new group
-        loadGroups();
+        notifyGroupChanged(data.group.id);
       } else {
         errorMsg.textContent = data.message || "Failed to create group";
       }
@@ -1645,9 +1813,10 @@ function addContactsToGroup() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh group settings
+        // Close modal and notify about group change
         document.getElementById("add-to-group-modal").style.display = "none";
         errorMsg.textContent = "";
+        notifyGroupChanged(groupId);
 
         // Reopen group settings to show updated members
         openGroupSettings(groupId);
@@ -1687,12 +1856,10 @@ function updateGroup() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh groups
+        // Close modal and notify about group change
         hideGroupSettingsModal();
         errorMsg.textContent = "";
-
-        // Reload groups to show updates
-        loadGroups();
+        notifyGroupChanged(currentGroup);
 
         // Update chat header if this is the current group
         const chatHeaderTitle = document.getElementById('chat-header-title');
@@ -1715,6 +1882,7 @@ function deleteGroup() {
   }
 
   const errorMsg = document.getElementById("group-settings-error");
+  const groupId = currentGroup;
 
   fetch(`/api/groups/${currentGroup}`, {
     method: 'DELETE',
@@ -1725,9 +1893,10 @@ function deleteGroup() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh groups
+        // Close modal and notify about group change
         hideGroupSettingsModal();
         errorMsg.textContent = "";
+        notifyGroupChanged(groupId);
 
         // Clear current group if this was it
         if (currentGroup) {
@@ -1748,9 +1917,6 @@ function deleteGroup() {
             sendButton.disabled = true;
           }
         }
-
-        // Reload groups
-        loadGroups();
       } else {
         errorMsg.textContent = data.message || "Failed to delete group";
       }
@@ -1767,6 +1933,7 @@ function leaveGroup() {
   }
 
   const errorMsg = document.getElementById("group-settings-error");
+  const groupId = currentGroup;
 
   fetch(`/api/groups/${currentGroup}/leave`, {
     method: 'POST',
@@ -1777,9 +1944,10 @@ function leaveGroup() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
-        // Close modal and refresh groups
+        // Close modal and notify about group change
         hideGroupSettingsModal();
         errorMsg.textContent = "";
+        notifyGroupChanged(groupId);
 
         // Clear current group if this was it
         if (currentGroup) {
@@ -1800,9 +1968,6 @@ function leaveGroup() {
             sendButton.disabled = true;
           }
         }
-
-        // Reload groups
-        loadGroups();
       } else {
         errorMsg.textContent = data.message || "Failed to leave group";
       }
