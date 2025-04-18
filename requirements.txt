@@ -10,4 +10,5 @@ groq==0.20.0
 Flask-SocketIO==5.3.6
 python-socketio==5.11.1
 python-engineio==4.9.1
-eventlet==0.33.3
+gevent-websocket==0.10.1
+gevent==23.9.1
