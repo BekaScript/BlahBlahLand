@@ -16,9 +16,7 @@
       <div class="overlay" id="overlay"></div>
       <div id="side-menu">
         <div id="closeSideMenu">
-          <div class="burger-line"></div>
-          <div class="burger-line"></div>
-          <div class="burger-line"></div>
+          <img src="{{ url_for('static', filename='images/menu.png') }}" alt="Close Menu">
         </div>
         <div class="menu-items">
           <a href="#" class="menu-item">
@@ -37,9 +35,7 @@
       </div>
       <div id="users-header">
         <div id="openSideMenu">
-          <div class="burger-line"></div>
-          <div class="burger-line"></div>
-          <div class="burger-line"></div>
+          <img src="{{ url_for('static', filename='images/menu.png') }}" alt="Menu">
         </div>
         <div class="search-wrapper">
           <img src="{{ url_for('static', filename='images/search.png') }}" class="search-icon" alt="">
@@ -54,7 +50,9 @@
 
     <div id="chat-box">
       <div id="chat-header">
-        <div id="chat-header-left"></div>
+        <div id="chat-header-left">
+          <h3 id="chat-header-title"></h3>
+        </div>
         <div id="chat-header-right">
           <img id="star" src="{{ url_for('static', filename='images/star.png') }}" alt="" class="header-icon">
           <img id="settings" src="{{ url_for('static', filename='images/settings.png') }}" alt="" class="header-icon">

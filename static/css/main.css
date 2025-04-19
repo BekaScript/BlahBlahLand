@@ -78,20 +78,10 @@ body {
 #closeSideMenu {
   position: absolute;
   top: 15px;
-  left: 15px;
+  left: 10px;
   cursor: pointer;
   width: 24px;
   height: 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.burger-line {
-  width: 100%;
-  height: 3px;
-  background-color: #333;
-  margin: 2px 0;
 }
 
 #openSideMenu {
@@ -99,18 +89,16 @@ body {
   cursor: pointer;
   width: 24px;
   height: 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 0;
-  margin: 0;
+  margin-right: 0 !important;
+  margin-left: -5px;
+  margin-top: -5px;
 }
 
-#openSideMenu .burger-line {
-  width: 100%;
-  height: 2px;
-  background-color: #333;
-  margin: 2px 0;
+#openSideMenu img,
+#closeSideMenu img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 #logout {
@@ -120,20 +108,10 @@ body {
 #users-header {
   display: flex;
   align-items: center;
-  padding: 12px 15px;
+  padding: 5px 15px !important;
   gap: 10px;
   background-color: #f5f5f5;
   border-bottom: 1px solid #e0e0e0;
-  justify-content: space-between;
-}
-
-#openSideMenu {
-  flex: 0 0 auto;
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  flex-direction: column;
   justify-content: space-between;
 }
 
@@ -157,9 +135,15 @@ body {
 #users-header h3 {
   flex: 0 0 auto;
   font-family: Arial, sans-serif;
-  font-size: 24px;
+  font-size: 30px;
   margin: 0;
   font-weight: 600;
+}
+
+#chat-header-title {
+  margin: 0;
+  padding: 0;
+  font-weight: 400;
 }
 
 #contact-search-input {
@@ -210,19 +194,37 @@ body {
 }
 
 #chat-box {
-  width: 70%;
+  width: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: #fff;
+  border-left: 10px solid #008080;
+  border-right: 10px solid #008080;
+  margin: 0;
+  overflow: hidden;
+}
+
+#messages {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+  background-color: #F9F9F9;
+  height: calc(100vh - 120px);
 }
 
 #chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 15px;
-  background-color: #009688;
+  padding: 20px 1px;
+  background-color: #008080;
   color: white;
+}
+
+#chat-header-left {
+  font-size: 18px;
+  font-weight: 500;
 }
 
 #chat-header-right {
@@ -237,43 +239,70 @@ body {
   cursor: pointer;
 }
 
-#messages {
-  flex: 1;
+.messages-scroll {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow-y: auto;
   padding: 15px;
-  display: flex;
-  flex-direction: column;
-  background-color: #fff;
+}
+
+.message {
+  margin-bottom: 8px;
+  max-width: 80%;
+  padding: 0 15px;
+}
+
+.message.own {
+  margin-left: auto;
+}
+
+.message-content {
+  padding: 8px 12px;
+  border-radius: 15px;
+  background-color: #f0f0f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  color: #000;
+}
+
+.message.own .message-content {
+  background-color: #008080;
+  color: #000;
 }
 
 #input-container {
   display: flex;
-  padding: 10px 15px;
-  background-color: #009688;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  background-color: #008080;
   align-items: center;
+  gap: 8px;
+  border-top: 2px solid #008080;
 }
 
 #message-input {
   flex: 1;
-  padding: 12px 15px;
+  padding: 12px 20px;
   border: none;
   border-radius: 25px;
-  margin-right: 10px;
   font-size: 14px;
-  height: 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #333;
+}
+
+#message-input::placeholder {
+  color: #666;
 }
 
 #send-button {
   background-color: #4CAF50;
   color: #fff;
   border: none;
-  border-radius: 25px;
-  padding: 0 20px;
+  border-radius: 30px;
+  padding: 0 30px;
   cursor: pointer;
-  font-weight: bold;
-  height: 36px;
-  text-transform: uppercase;
+  height: 40px;
   font-size: 14px;
 }
 
@@ -430,13 +459,28 @@ body {
 }
 
 #chat-window-header {
-  background: #0D9488;
+  background: #008080;
   color: white;
   padding: 12px 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
+}
+
+#chat-window-header button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+#chat-window-header button:hover {
+  opacity: 0.8;
 }
 
 #ai-chat-messages {
@@ -494,7 +538,7 @@ body {
 }
 
 #ai-send-button {
-  background-color: #0D9488;
+  background-color: #008080;
   color: white;
   border: none;
   border-radius: 20px;
