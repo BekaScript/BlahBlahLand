@@ -233,8 +233,8 @@ body {
 }
 
 .header-icon {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   filter: brightness(0) invert(1);
   cursor: pointer;
 }
@@ -449,7 +449,7 @@ body {
   position: fixed;
   top: 0;
   right: 0;
-  width: 350px;
+  width: 400px;
   height: 100vh;
   background: white;
   box-shadow: -2px 0 15px rgba(0, 0, 0, 0.2);
@@ -524,7 +524,7 @@ body {
   display: flex;
   padding: 10px;
   border-top: 1px solid #eee;
-  background-color: white;
+  background-color: #008080;
 }
 
 #ai-message-input {
@@ -533,22 +533,33 @@ body {
   border: 1px solid #ddd;
   border-radius: 20px;
   resize: none;
-  height: 40px;
+  height: 20px;
   margin-right: 10px;
+  font-family: 'Inter', sans-serif;
+  line-height: 10px;
+}
+
+#ai-message-input::placeholder {
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: normal;
 }
 
 #ai-send-button {
-  background-color: #008080;
+  background-color: #4CAF50;
   color: white;
   border: none;
   border-radius: 20px;
   padding: 0 15px;
   cursor: pointer;
   height: 40px;
+  width: 100px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 #ai-send-button:hover {
-  background-color: #0b7c72;
+  background-color: #45a049;
 }
 
 #ai-help-button {
