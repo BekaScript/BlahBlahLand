@@ -13,10 +13,10 @@ function initUI() {
   const addToGroupModal = document.getElementById("add-to-group-modal");
   
   // Hide standard modals
-  if (addContactModal) addContactModal.style.display = "none";
-  if (createGroupModal) createGroupModal.style.display = "none";
-  if (contactSettingsModal) contactSettingsModal.style.display = "none";
-  if (addToGroupModal) addToGroupModal.style.display = "none";
+  if (addContactModal) addContactModal.classList.remove("show");
+  if (createGroupModal) createGroupModal.classList.remove("show");
+  if (contactSettingsModal) contactSettingsModal.classList.remove("show");
+  if (addToGroupModal) addToGroupModal.classList.remove("show");
 
   // Special handling for group settings modal
   const groupSettingsModal = document.getElementById("group-settings-modal");
@@ -75,7 +75,8 @@ function initSidebar() {
       if (text === "Add contact") {
         const modal = document.getElementById("add-contact-modal");
         if (modal) {
-          modal.style.display = "block";
+          modal.classList.add("show");
+          modal.style.display = "";
           closeSideMenu();
         }
       } else if (text === "Create a group") {
@@ -283,6 +284,7 @@ function initAddContactModal() {
   }
 
   closeButton.addEventListener("click", function () {
+    modal.classList.remove("show");
     modal.style.display = "none";
   });
 
@@ -332,6 +334,7 @@ function initAddContactModal() {
         console.log("Debug: Contact add response data", data);
         if (data.success) {
           // Close modal and refresh contacts
+          modal.classList.remove("show");
           modal.style.display = "none";
           contactIdentifier.value = "";
           if (contactDisplayName) contactDisplayName.value = "";
@@ -352,6 +355,7 @@ function initAddContactModal() {
   // Close modal when clicking outside
   window.addEventListener("click", function (event) {
     if (event.target === modal) {
+      modal.classList.remove("show");
       modal.style.display = "none";
       const errorMsg = document.getElementById("modal-error-msg");
       if (errorMsg) errorMsg.textContent = "";
@@ -764,7 +768,7 @@ function sendMessage() {
   fetch('/api/messages', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(data)
   })
@@ -1083,7 +1087,7 @@ function initGroupModals() {
   modals.forEach(modalId => {
     const modal = document.getElementById(modalId);
     if (modal) {
-      modal.style.display = "none";
+      modal.classList.remove("show");
     }
   });
 
@@ -1119,6 +1123,7 @@ function createGroupModalElement() {
   // Close button event
   const closeButton = modal.querySelector(".close-modal");
   closeButton.addEventListener("click", function () {
+    modal.classList.remove("show");
     modal.style.display = "none";
   });
 
@@ -1131,6 +1136,7 @@ function createGroupModalElement() {
   // Close modal when clicking outside
   window.addEventListener("click", function (event) {
     if (event.target === modal) {
+      modal.classList.remove("show");
       modal.style.display = "none";
     }
   });
@@ -1414,8 +1420,8 @@ function createAddToGroupModalElement() {
   // Close button event
   const closeButton = modal.querySelector(".close-modal");
   closeButton.addEventListener("click", function () {
+    modal.classList.remove("show");
     modal.style.display = "none";
-    document.getElementById("add-to-group-error").textContent = "";
   });
 
   // Add selected contacts button
@@ -1431,8 +1437,8 @@ function createAddToGroupModalElement() {
   // Close modal when clicking outside
   window.addEventListener("click", function (event) {
     if (event.target === modal) {
+      modal.classList.remove("show");
       modal.style.display = "none";
-      document.getElementById("add-to-group-error").textContent = "";
     }
   });
 }
@@ -1458,7 +1464,8 @@ function openCreateGroupModal() {
   loadContactsForSelection(contactsList);
 
   // Show modal
-  modal.style.display = "block";
+  modal.classList.add("show");
+  modal.style.display = "";
 }
 
 // Load contacts for group creation or adding to a group
@@ -1607,6 +1614,7 @@ function createGroup() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh groups
+        document.getElementById("create-group-modal").classList.remove("show");
         document.getElementById("create-group-modal").style.display = "none";
         errorMsg.textContent = "";
 
@@ -1646,6 +1654,7 @@ function addContactsToGroup() {
     .then(data => {
       if (data.success) {
         // Close modal and refresh group settings
+        document.getElementById("add-to-group-modal").classList.remove("show");
         document.getElementById("add-to-group-modal").style.display = "none";
         errorMsg.textContent = "";
 
@@ -1864,13 +1873,15 @@ function openEditMessageModal(messageId, messageText) {
     
     // Add event listeners
     modal.querySelector('.close-modal').addEventListener('click', function() {
-      modal.style.display = 'none';
+      modal.classList.remove("show");
+      modal.style.display = "none";
     });
     
     // Close on click outside the modal content
     window.addEventListener('click', function(e) {
       if (e.target === modal) {
-        modal.style.display = 'none';
+        modal.classList.remove("show");
+        modal.style.display = "none";
       }
     });
   }
@@ -1892,11 +1903,13 @@ function openEditMessageModal(messageId, messageText) {
     if (newText && newText !== messageText) {
       updateMessage(messageId, newText);
     }
-    modal.style.display = 'none';
+    modal.classList.remove("show");
+    modal.style.display = "none";
   });
   
   // Show modal
-  modal.style.display = 'block';
+  modal.classList.add("show");
+  modal.style.display = "";
   
   // Focus on input
   messageInput.focus();
@@ -1922,13 +1935,15 @@ function openDeleteMessageModal(messageId) {
     
     // Add event listeners
     modal.querySelector('.close-modal').addEventListener('click', function() {
-      modal.style.display = 'none';
+      modal.classList.remove("show");
+      modal.style.display = "none";
     });
     
     // Close on click outside the modal content
     window.addEventListener('click', function(e) {
       if (e.target === modal) {
-        modal.style.display = 'none';
+        modal.classList.remove("show");
+        modal.style.display = "none";
       }
     });
   }
@@ -1943,11 +1958,13 @@ function openDeleteMessageModal(messageId) {
   // Add new event listener
   newDeleteButton.addEventListener('click', function() {
     deleteMessage(messageId);
-    modal.style.display = 'none';
+    modal.classList.remove("show");
+    modal.style.display = "none";
   });
   
   // Show modal
-  modal.style.display = 'block';
+  modal.classList.add("show");
+  modal.style.display = "";
 }
 
 function updateMessage(messageId, newText) {
@@ -2034,5 +2051,6 @@ function openAddToGroupModal(groupId) {
   loadContactsForSelection(contactsContainer, true);
 
   // Show modal
-  modal.style.display = "block";
+  modal.classList.add("show");
+  modal.style.display = "";
 }

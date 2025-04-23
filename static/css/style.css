@@ -912,6 +912,22 @@
   height: 24px;
 }
 
+/* Add Contact modal alignment like settings */
+#add-contact-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20vh;
+}
+
+/* Create Group modal alignment like settings */
+#create-group-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20vh;
+}
+
 /* Стили для иконок действий */
 .action-icon {
   width: 16px;
@@ -959,9 +975,9 @@
   background-color: #4CAF50;
 }
 
-.menu-items {
+/* .menu-items {
     padding: 15px 0;
-}
+} */
 
 .menu-item {
     display: flex;
