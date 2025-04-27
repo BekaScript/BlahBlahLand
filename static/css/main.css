@@ -226,6 +226,18 @@ body {
   padding: 20px 1px;
   background-color: #008080;
   color: white;
+  position: relative;
+}
+
+.chat-header-divider {
+  border-bottom: 1px solid #000;
+  margin: 0;
+  height: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
 }
 
 #chat-header-left {
@@ -375,13 +387,16 @@ body {
 
 .modal-content {
   background-color: #fefefe;
-  margin: 100px auto;
+  margin: 0;
   padding: 20px;
   border: 1px solid #888;
   width: 90%;
   max-width: 400px;
   border-radius: 8px;
-  position: relative;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .close-modal {
@@ -503,19 +518,20 @@ body {
 .user-message {
   max-width: 80%;
   padding: 10px 12px;
-  border-radius: 15px;
+  border-radius: 10px;
   margin-bottom: 5px;
 }
 
 .ai-message {
   align-self: flex-start;
-  background-color: #f0f0f0;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
 }
 
 .user-message {
   align-self: flex-end;
-  background-color: #0D9488;
-  color: white;
+  background-color: #DCF8C6;
+  color: #000;
 }
 
 .ai-welcome-message {
@@ -531,13 +547,14 @@ body {
   padding: 10px;
   border-top: 1px solid #eee;
   background-color: #008080;
+  align-items: center;
 }
 
 #ai-message-input {
   flex: 1;
-  padding: 10px 18px;
+  padding: 10px 15px;
   border: 2px solid #222;
-  border-radius: 25px;
+  border-radius: 20px;
   resize: none;
   height: 40px;
   margin-right: 10px;
@@ -551,6 +568,8 @@ body {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 
 #ai-message-input::-webkit-scrollbar {
@@ -571,7 +590,7 @@ body {
   padding: 0 15px;
   cursor: pointer;
   height: 40px;
-  width: 100px;
+  width: 80px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -769,4 +788,23 @@ body {
 #add-contact,
 #create-group {
   margin-bottom: 10px;
+}
+
+/* Special styling for dynamically created modals */
+html body #edit-message-modal.modal[style*="display: block"],
+html body #delete-message-modal.modal[style*="display: block"] {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+html body #edit-message-modal .modal-content,
+html body #delete-message-modal .modal-content {
+  margin: 0 auto;
+  position: relative;
+  top: auto;
+  left: auto; 
+  transform: none;
+  margin-top: 0;
 }

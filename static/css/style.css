@@ -85,8 +85,11 @@
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  position: relative;
-  margin: 0 auto;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
 }
 
 .close-modal {
@@ -317,12 +320,6 @@
   word-wrap: break-word;
 }
 
-.edited-label {
-  font-size: 0.7em;
-  color: black;
-  margin-left: 5px;
-}
-
 /* Message action buttons */
 .message-actions {
   position: absolute;
@@ -376,10 +373,28 @@
   background-color: rgba(0, 0, 0, 0.4);
 }
 
+/* When displayed with style.display = 'block' via JS */
+.edit-message-modal[style*="display: block"],
+.delete-message-modal[style*="display: block"] {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+.edit-message-modal.show,
+.delete-message-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
 .edit-message-content,
 .delete-message-content {
   background-color: white;
-  margin: 15% auto;
+  margin: 0 auto;
+  margin-top: 15vh;
   padding: 20px;
   border-radius: 8px;
   width: 80%;
@@ -814,7 +829,7 @@
   display: flex !important;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 20vh; /* Add padding from the top instead of centering vertically */
+  padding-top: 15vh;
 }
 
 #contact-settings-modal .modal-content {
@@ -870,7 +885,7 @@
   display: flex !important;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 20vh; /* Add padding from the top instead of centering vertically */
+  padding-top: 15vh;
 }
 
 #group-settings-modal .modal-content {
@@ -917,7 +932,7 @@
   display: flex !important;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 20vh;
+  padding-top: 15vh;
 }
 
 /* Create Group modal alignment like settings */
@@ -925,7 +940,7 @@
   display: flex !important;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 20vh;
+  padding-top: 15vh;
 }
 
 /* Стили для иконок действий */
@@ -1031,4 +1046,55 @@
   position: relative;
   padding-right: 20px;
   margin-right: 20px;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+}
+
+#contact-settings-modal .modal-content,
+#group-settings-modal .modal-content,
+#add-to-group-modal .modal-content,
+#edit-message-modal .modal-content,
+#delete-message-modal .modal-content {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 0 auto;
+}
+
+/* Specific style for dynamically created edit/delete message modals */
+#edit-message-modal.modal,
+#delete-message-modal.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+#edit-message-modal[style*="display: block"],
+#delete-message-modal[style*="display: block"] {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 15vh;
+}
+
+#edit-message-modal .modal-content,
+#delete-message-modal .modal-content {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 0 auto;
+  margin-top: 0;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 15px;
+  padding: 20px;
 }

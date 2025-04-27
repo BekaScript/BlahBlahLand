@@ -270,15 +270,6 @@ function startUpdatePolling() {
                 const textEl = messageEl.querySelector('.message-text');
                 if (textEl && textEl.textContent !== info.message) {
                   textEl.textContent = info.message;
-                  
-                  // Add or update edited label
-                  let editedLabel = messageEl.querySelector('.edited-label');
-                  if (!editedLabel) {
-                    editedLabel = document.createElement('span');
-                    editedLabel.className = 'edited-label';
-                    editedLabel.textContent = '(edited)';
-                    messageEl.querySelector('.message-content').appendChild(editedLabel);
-                  }
                 }
               }
               
@@ -2543,17 +2534,6 @@ function updateMessage(messageId, newText) {
         const messageElement = document.querySelector(`.message[data-id="${messageId}"] .message-text`);
         if (messageElement) {
           messageElement.textContent = newText;
-          
-          // Add edited label if not already present
-          const messageContent = messageElement.closest('.message-content');
-          if (messageContent) {
-            if (!messageContent.querySelector('.edited-label')) {
-              const editedLabel = document.createElement('span');
-              editedLabel.className = 'edited-label';
-              editedLabel.textContent = '(edited)';
-              messageContent.appendChild(editedLabel);
-            }
-          }
         }
       } else {
         alert("Failed to update message. Please try again.");
