@@ -296,22 +296,20 @@
 
 /* Add outline to contact messages */
 .message:not(.own) .message-content {
-  outline: 2px solid #e0e0e0;
-  background-color: #fff;
-  border-radius: 8px;
+  outline: 2px solid gray;
 }
 
 .message.own .message-content {
   background-color: #DCF8C6;
-  border-radius: 8px;
 }
 
 .sender-name {
   font-weight: bold;
-  font-size: 0.85em;
+  font-size: 0.9em;
   margin-bottom: 4px;
   color: #333;
   display: block;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   padding-bottom: 3px;
 }
 
@@ -912,6 +910,22 @@
   display: flex;
   align-items: center;
   height: 24px;
+}
+
+/* Add Contact modal alignment like settings */
+#add-contact-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20vh;
+}
+
+/* Create Group modal alignment like settings */
+#create-group-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 20vh;
 }
 
 /* Стили для иконок действий */
