@@ -249,4 +249,129 @@ def get_message_read_status():
         
         return jsonify({"success": True, "read_status": result})
     except ValueError:
+        return jsonify({"success": False, "message": "Invalid message ID format"}), 400
+
+@chat.route('/api/messages/poll', methods=['GET'])
+def poll_messages():
+    """
+    Endpoint for polling new messages since a given timestamp
+    """
+    if 'user_id' not in session:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+    
+    user_id = session['user_id']
+    contact_id = request.args.get('contact_id', type=int)
+    group_id = request.args.get('group_id', type=int)
+    last_timestamp = request.args.get('timestamp')
+    
+    if not (contact_id or group_id):
+        return jsonify({"success": False, "message": "Missing contact_id or group_id parameter"}), 400
+    
+    if not last_timestamp:
+        return jsonify({"success": False, "message": "Last timestamp is required"}), 400
+    
+    try:
+        last_time = datetime.strptime(last_timestamp, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return jsonify({"success": False, "message": "Invalid timestamp format"}), 400
+    
+    # Query for new messages
+    if group_id:
+        # Check if user is a member of the group
+        is_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+        if not is_member:
+            return jsonify({"success": False, "message": "Not a member of this group"}), 403
+        
+        # Get group messages newer than the given timestamp
+        messages = Message.query.filter(
+            Message.group_id == group_id,
+            Message.is_group_message == True,
+            Message.timestamp > last_time
+        ).order_by(Message.timestamp).all()
+    elif contact_id:
+        # Get direct messages between users newer than the given timestamp
+        messages = Message.query.filter(
+            ((Message.sender_id == user_id) & (Message.receiver_id == contact_id)) |
+            ((Message.sender_id == contact_id) & (Message.receiver_id == user_id)),
+            Message.is_group_message == False,
+            Message.timestamp > last_time
+        ).order_by(Message.timestamp).all()
+    
+    # Format messages
+    formatted_messages = []
+    for msg in messages:
+        sender = User.query.get(msg.sender_id)
+        
+        # Check if current user has read this message
+        is_read = msg.is_read_by(user_id)
+        
+        # Automatically mark messages from others as read if user is viewing them
+        if msg.sender_id != user_id and not is_read:
+            msg.mark_as_read_by(user_id)
+            db.session.commit()
+            is_read = True
+        
+        formatted_messages.append({
+            "id": msg.id,
+            "sender_id": msg.sender_id,
+            "sender_username": sender.username,
+            "message": msg.message_text,
+            "timestamp": msg.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "is_own_message": msg.sender_id == user_id,
+            "edited": msg.edited,
+            "is_read": is_read,
+            "read_by": msg.read_by if msg.sender_id == user_id else None
+        })
+    
+    return jsonify({"success": True, "messages": formatted_messages})
+
+@chat.route('/api/messages/updates', methods=['GET'])
+def poll_message_updates():
+    """
+    Endpoint for polling updates to existing messages (edits, deletions, read status)
+    """
+    if 'user_id' not in session:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+    
+    user_id = session['user_id']
+    message_ids = request.args.get('ids', '')
+    
+    if not message_ids:
+        return jsonify({"success": False, "message": "No message IDs provided"}), 400
+    
+    try:
+        message_id_list = [int(id_str) for id_str in message_ids.split(',')]
+        
+        # Check for updates to the specified messages
+        message_updates = {}
+        deleted_messages = []
+        
+        for message_id in message_id_list:
+            message = Message.query.get(message_id)
+            if message:
+                # For own messages, include read status
+                if message.sender_id == user_id:
+                    message_updates[message_id] = {
+                        "edited": message.edited,
+                        "message": message.message_text,
+                        "read_by": message.read_by
+                    }
+                else:
+                    # For messages from others, just include edit status and text
+                    message_updates[message_id] = {
+                        "edited": message.edited,
+                        "message": message.message_text,
+                        "is_read": message.is_read_by(user_id)
+                    }
+            else:
+                # Message not found - might have been deleted
+                deleted_messages.append(message_id)
+        
+        return jsonify({
+            "success": True, 
+            "updates": message_updates,
+            "deleted": deleted_messages
+        })
+    
+    except ValueError:
         return jsonify({"success": False, "message": "Invalid message ID format"}), 400 

@@ -259,4 +259,64 @@ def leave_group(group_id):
     db.session.delete(membership)
     db.session.commit()
     
-    return jsonify({"success": True, "message": "Left the group successfully"}) 
+    return jsonify({"success": True, "message": "Left the group successfully"})
+
+@groups.route('/api/groups/poll', methods=['GET'])
+def poll_groups():
+    """
+    Endpoint for polling group list and membership changes
+    """
+    if 'user_id' not in session:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    user_id = session['user_id']
+    last_poll = request.args.get('last_poll')
+    
+    # Get current groups
+    user_groups = db.session.query(
+        Group, GroupMember.is_admin
+    ).join(
+        GroupMember, GroupMember.group_id == Group.id
+    ).filter(
+        GroupMember.user_id == user_id
+    ).all()
+    
+    current_groups = [
+        {
+            "id": group.id,
+            "name": group.name,
+            "is_admin": is_admin,
+            "created_by": group.created_by
+        }
+        for group, is_admin in user_groups
+    ]
+    
+    # Get current group IDs for simple comparison
+    current_group_ids = [group["id"] for group in current_groups]
+    
+    # If last_poll contains a comma-separated list of previous group IDs,
+    # we can determine additions and removals
+    changes = {"added": [], "updated": [], "removed": []}
+    
+    if last_poll:
+        try:
+            # Parse the previous group IDs
+            previous_group_ids = [int(id_str) for id_str in last_poll.split(',')]
+            
+            # Find removed groups (in previous but not current)
+            removed_ids = [id for id in previous_group_ids if id not in current_group_ids]
+            changes["removed"] = removed_ids
+            
+            # Find added groups (in current but not previous)
+            added_groups = [group for group in current_groups if group["id"] not in previous_group_ids]
+            changes["added"] = added_groups
+            
+        except ValueError:
+            # If there's an error parsing the IDs, just return the current list
+            pass
+    
+    return jsonify({
+        "success": True,
+        "groups": current_groups,
+        "changes": changes
+    }) 

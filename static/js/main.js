@@ -27,8 +27,8 @@ function initUI() {
   initContactSettings();
   initGroupModals();
 
-  // Initialize WebSocket connection
-  initWebSocket();
+  // Initialize polling
+  initPolling();
 
   // Check if user is logged in
   checkLoginStatus();
@@ -36,69 +36,332 @@ function initUI() {
 
 document.addEventListener("DOMContentLoaded", initUI);
 
-// WebSocket connection
-let socket = null;
+// Polling variables
+let pollingIntervals = {
+  messages: null,
+  contacts: null,
+  groups: null
+};
 
-function initWebSocket() {
-  // Create socket connection
-  socket = io();
+let currentContactIds = [];
+let currentGroupIds = [];
 
-  // Connection events
-  socket.on('connect', function() {
-    console.log('WebSocket connected');
-  });
-
-  socket.on('disconnect', function() {
-    console.log('WebSocket disconnected');
-  });
-
-  // Message events
-  socket.on('new_message', function(data) {
-    // Handle incoming message
-    displayNewMessage(data);
-  });
-
-  // List update events
-  socket.on('contacts_list', function(data) {
-    if (data.success) {
-      displayContacts(data.contacts);
-    }
-  });
-
-  socket.on('groups_list', function(data) {
-    if (data.success) {
-      displayGroups(data.groups);
-    }
-  });
-
-  // Trigger to request updated lists
-  socket.on('trigger_update_lists', function() {
-    requestListUpdates();
-  });
+function initPolling() {
+  console.log('Initializing polling...');
+  
+  // Start polling for contacts and groups
+  startContactsPolling();
+  startGroupsPolling();
+  
+  // Message polling will start when a chat is opened
 }
 
-// Request updated contacts and groups lists
-function requestListUpdates() {
-  if (socket && socket.connected) {
-    socket.emit('update_lists');
+// Stop all polling
+function stopPolling() {
+  Object.values(pollingIntervals).forEach(interval => {
+    if (interval) {
+      clearInterval(interval);
+    }
+  });
+  
+  pollingIntervals = {
+    messages: null,
+    contacts: null,
+    groups: null
+  };
+}
+
+// Start polling for new messages
+function startMessagePolling() {
+  if (pollingIntervals.messages) {
+    clearInterval(pollingIntervals.messages);
   }
+  
+  // Poll for full chat updates every 1 second
+  pollingIntervals.messages = setInterval(() => {
+    if (!currentContact && !currentGroup) {
+      return; // No chat open, don't poll
+    }
+    
+    // Check if there are any "own" messages in the chat that we need to check read status for
+    const hasOwnMessages = document.querySelectorAll('#messages .message.own').length > 0;
+    
+    // Simply reload all messages for the current chat
+    if (currentContact) {
+      loadMessages(currentContact, 'contact');
+    } else if (currentGroup) {
+      loadMessages(currentGroup, 'group');
+    }
+    
+    // If user has sent messages, also check read status specifically
+    if (hasOwnMessages) {
+      checkReadStatus();
+    }
+    
+  }, 1000); // 1 second interval
+}
+
+// Check read status for own messages separately
+function checkReadStatus() {
+  // Get IDs of own messages
+  const ownMessageIds = Array.from(
+    document.querySelectorAll('#messages .message.own')
+  ).map(el => el.getAttribute('data-id'));
+  
+  if (ownMessageIds.length === 0) {
+    return;
+  }
+  
+  // API call to get read status
+  fetch(`/api/messages/read-status?ids=${ownMessageIds.join(',')}`)
+    .then(response => response.json())
+    .then(data => {
+    if (data.success) {
+        // Update read status for each message
+        for (const [messageId, isRead] of Object.entries(data.read_status)) {
+          const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
+          if (messageEl && messageEl.classList.contains('own')) {
+            if (isRead && isRead.length > 0) {
+              messageEl.classList.add('read');
+            } else {
+              messageEl.classList.remove('read');
+            }
+          }
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error checking read status:', error);
+    });
+}
+
+// Load messages for current chat
+function loadMessages(id, type) {
+  const messagesContainer = document.getElementById("messages");
+
+  if (!messagesContainer) {
+    return;
+  }
+
+  let url;
+  if (type === 'contact') {
+    url = `/api/messages?contact_id=${id}`;
+  } else {
+    url = `/api/messages?group_id=${id}`;
+  }
+
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+    if (data.success) {
+        if (!data.messages || data.messages.length === 0) {
+          messagesContainer.innerHTML = '<div class="no-messages">No messages yet. Start the conversation!</div>';
+        } else {
+          // Get current message elements
+          const currentMessages = {};
+          messagesContainer.querySelectorAll('.message').forEach(el => {
+            const msgId = el.getAttribute('data-id');
+            currentMessages[msgId] = el;
+          });
+          
+          // Track which messages we've processed
+          const processedIds = {};
+          
+          // Track if we need to rebuild the UI
+          let needsRebuild = false;
+          
+          // First pass - check if content is different
+          if (messagesContainer.querySelector('.no-messages')) {
+            // We had no messages before but now we do - need rebuild
+            needsRebuild = true;
+          } else {
+            // Check if the message IDs are different
+            const currentIds = Object.keys(currentMessages).sort();
+            const newIds = data.messages.map(msg => msg.id.toString()).sort();
+            
+            if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+              needsRebuild = true;
+            } else {
+              // Check if any message content has changed
+              data.messages.forEach(msg => {
+                const msgId = msg.id.toString();
+                const msgEl = currentMessages[msgId];
+                
+                if (msgEl) {
+                  // Check message content
+                  const messageText = msgEl.querySelector('.message-text');
+                  if (messageText && messageText.textContent !== msg.message) {
+                    needsRebuild = true;
+                  }
+                  
+                  // Update read status regardless of rebuild
+                  if (msg.is_own_message && msg.read_by && msg.read_by.length > 0) {
+                    msgEl.classList.add('read');
+                  }
+                }
+              });
+            }
+          }
+          
+          // Mark other users' messages as read regardless of rebuild
+          data.messages.forEach(msg => {
+            if (!msg.is_own_message) {
+              markMessageAsRead(msg.id);
+            }
+          });
+          
+          // Only rebuild if needed
+          if (needsRebuild) {
+            messagesContainer.innerHTML = '';
+            
+            // Add all messages
+            data.messages.forEach(msg => {
+              displayNewMessage(msg);
+            });
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          } else {
+            // Just update read status without triggering reflow
+            data.messages.forEach(msg => {
+              const msgId = msg.id.toString();
+              const msgEl = currentMessages[msgId];
+              
+              if (msgEl && msg.is_own_message && msg.read_by && msg.read_by.length > 0) {
+                msgEl.classList.add('read');
+              }
+            });
+          }
+        }
+      } else {
+        messagesContainer.innerHTML = '<div class="error-message">Failed to load messages</div>';
+      }
+    })
+    .catch(error => {
+      messagesContainer.innerHTML = '<div class="error-message">Failed to load messages</div>';
+    });
+}
+
+// Start polling for message updates (read status, edits, etc.)
+function startUpdatePolling() {
+  if (pollingIntervals.updates) {
+    clearInterval(pollingIntervals.updates);
+  }
+  
+  // Poll for updates every 1 second
+  pollingIntervals.updates = setInterval(() => {
+    if (displayedMessageIds.length === 0) {
+      return; // No messages to check
+    }
+    
+    const url = `/api/messages/updates?ids=${displayedMessageIds.join(',')}`;
+    
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log('Checking message updates');
+          // Handle updates
+          for (const [messageId, info] of Object.entries(data.updates)) {
+            const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
+            if (messageEl) {
+              // Update message text if edited
+              if (info.edited) {
+                const textEl = messageEl.querySelector('.message-text');
+                if (textEl && textEl.textContent !== info.message) {
+                  textEl.textContent = info.message;
+                  
+                  // Add or update edited label
+                  let editedLabel = messageEl.querySelector('.edited-label');
+                  if (!editedLabel) {
+                    editedLabel = document.createElement('span');
+                    editedLabel.className = 'edited-label';
+                    editedLabel.textContent = '(edited)';
+                    messageEl.querySelector('.message-content').appendChild(editedLabel);
+                  }
+                }
+              }
+              
+              // Update read status for own messages
+              if (messageEl.classList.contains('own') && info.read_by && info.read_by.length > 0) {
+                messageEl.classList.add('read');
+              }
+            }
+          }
+          
+          // Handle deleted messages
+          data.deleted.forEach(messageId => {
+            const messageEl = document.querySelector(`.message[data-id="${messageId}"]`);
+            if (messageEl) {
+              messageEl.remove();
+              
+              // Remove from tracking array
+              const index = displayedMessageIds.indexOf(messageId);
+              if (index !== -1) {
+                displayedMessageIds.splice(index, 1);
+              }
+            }
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error polling for message updates:', error);
+      });
+  }, 1000); // 1 second interval
+}
+
+// Start polling for contacts
+function startContactsPolling() {
+  if (pollingIntervals.contacts) {
+    clearInterval(pollingIntervals.contacts);
+  }
+  
+  // Poll for contacts every 3 seconds
+  pollingIntervals.contacts = setInterval(() => {
+    fetch('/api/contacts')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update currentContactIds for polling
+          currentContactIds = data.contacts.map(contact => contact.id);
+          
+          // Always update contacts display
+          displayContacts(data.contacts);
+        }
+      })
+      .catch(error => {
+        console.error('Error polling for contacts:', error);
+      });
+  }, 3000); // 3 second interval
+}
+
+// Start polling for groups
+function startGroupsPolling() {
+  if (pollingIntervals.groups) {
+    clearInterval(pollingIntervals.groups);
+  }
+  
+  // Poll for groups every 3 seconds
+  pollingIntervals.groups = setInterval(() => {
+    fetch('/api/groups')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update currentGroupIds for polling
+          currentGroupIds = data.groups.map(group => group.id);
+          
+          // Always update groups display
+          displayGroups(data.groups);
+        }
+      })
+      .catch(error => {
+        console.error('Error polling for groups:', error);
+      });
+  }, 3000); // 3 second interval
 }
 
 // Display a new incoming message
 function displayNewMessage(message) {
-  // Only process if this is for the current chat
-  if ((currentContact && message.sender_id == currentContact) || 
-      (currentContact && message.receiver_id == currentContact) ||
-      (currentGroup && message.group_id == currentGroup)) {
-    
-    const messagesContainer = document.getElementById("messages");
-    if (!messagesContainer) return;
-    
-    // Check if the message already exists
-    if (document.querySelector(`.message[data-id="${message.id}"]`)) {
-      return; // Skip if already displayed
-    }
-    
     // Create message element
     const messageDiv = document.createElement('div');
     messageDiv.className = message.is_own_message ? 'message own' : 'message';
@@ -107,6 +370,11 @@ function displayNewMessage(message) {
     // Add read class if applicable
     if (message.is_own_message && message.read_by && message.read_by.length > 0) {
       messageDiv.classList.add('read');
+    }
+  
+  // Add sending class if applicable
+  if (message.sending) {
+    messageDiv.classList.add('sending');
     }
     
     // Create message content
@@ -159,16 +427,13 @@ function displayNewMessage(message) {
     
     // Add to DOM
     messageDiv.appendChild(messageContent);
+  
+  // Add to message container
+  const messagesContainer = document.getElementById("messages");
     messagesContainer.appendChild(messageDiv);
     
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    // Mark as read if it's not our own message
-    if (!message.is_own_message) {
-      markMessageAsRead(message.id);
-    }
-  }
 }
 
 // Sidebar menu handling
@@ -518,7 +783,7 @@ function initLogout() {
 }
 
 function logoutUser() {
-  fetch('/logout', {
+  fetch('/api/logout', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -527,13 +792,18 @@ function logoutUser() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+      // Stop all polling
+      stopPolling();
+      
+      // Redirect to login page
         window.location.href = '/login';
       } else {
-        console.error('Logout failed');
+      alert('Failed to log out');
       }
     })
     .catch(error => {
-      console.error('Error during logout:', error);
+    console.error('Logout error:', error);
+    alert('Failed to log out');
     });
 }
 
@@ -544,13 +814,9 @@ function checkLoginStatus() {
     .then(data => {
       if (data.success) {
         currentUser = data.user;
-        // Request initial lists
-        if (socket && socket.connected) {
-          requestListUpdates();
-        } else {
-          // Fallback to traditional loading
+        // Load contacts and groups via polling
           loadContacts();
-        }
+        loadGroups();
       } else {
         // Only redirect if we're not already on the login page
         if (!window.location.pathname.endsWith('/login') &&
@@ -560,7 +826,7 @@ function checkLoginStatus() {
       }
     })
     .catch(error => {
-      // Error handling for status check
+      console.error('Error checking login status:', error);
     });
 }
 
@@ -600,15 +866,97 @@ function displayContacts(contacts) {
   const usersList = document.getElementById("users");
   if (!usersList) return;
   
-  // Remove existing contacts but keep groups
-  const existingContacts = usersList.querySelectorAll('.user:not(.group)');
-  existingContacts.forEach(item => item.remove());
+  // Remember currently active chat
+  const activeChat = usersList.querySelector('.user.active');
+  let activeId = null;
+  let activeType = null;
   
-  // Add contacts
-  if (contacts.length > 0) {
+  if (activeChat) {
+    activeId = activeChat.getAttribute('data-id');
+    activeType = activeChat.getAttribute('data-type');
+  }
+  
+  // Get existing contacts
+  const existingContacts = {};
+  usersList.querySelectorAll('.user:not(.group)').forEach(item => {
+    const id = item.getAttribute('data-id');
+    existingContacts[id] = item;
+  });
+  
+  // Check if we need to rebuild
+  let needsRebuild = false;
+  
+  // Compare contact IDs
+  const currentIds = Object.keys(existingContacts).sort();
+  const newIds = contacts.map(contact => contact.id.toString()).sort();
+  
+  if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+    needsRebuild = true;
+  } else {
+    // Check if any contact information has changed
     contacts.forEach(contact => {
+      const contactId = contact.id.toString();
+      const contactElement = existingContacts[contactId];
+      
+      if (contactElement) {
+        // Check display name
+        const nameElement = contactElement.querySelector('.user-name');
+        const currentName = nameElement ? nameElement.textContent : '';
+        const newName = contact.display_name || contact.username;
+        
+        if (currentName !== newName) {
+          needsRebuild = true;
+        }
+        
+        // Check last message
+        const lastMessageElement = contactElement.querySelector('.last-message');
+        const currentLastMessage = lastMessageElement ? lastMessageElement.textContent : '';
+        const newLastMessage = contact.last_message || '';
+        
+        if (currentLastMessage !== newLastMessage) {
+          needsRebuild = true;
+        }
+      }
+    });
+  }
+  
+  // Only rebuild if needed
+  if (needsRebuild) {
+    // Process all contacts
+    contacts.forEach(contact => {
+      const contactId = contact.id.toString();
+      
+      // If contact already exists, update it
+      if (existingContacts[contactId]) {
+        const contactElement = existingContacts[contactId];
+        
+        // Update only what might have changed
+        const nameElement = contactElement.querySelector('.user-name');
+        if (nameElement) {
+          nameElement.textContent = contact.display_name || contact.username;
+        }
+        
+        const lastMessageElement = contactElement.querySelector('.last-message');
+        if (lastMessageElement && contact.last_message) {
+          lastMessageElement.textContent = contact.last_message;
+        }
+        
+        // Update data attributes
+        contactElement.setAttribute('data-username', contact.username);
+        contactElement.setAttribute('data-display-name', contact.display_name || '');
+        
+        // Keep track that we've processed this contact
+        delete existingContacts[contactId];
+      } else {
+        // Create new contact element
       const contactItem = document.createElement('li');
       contactItem.className = 'user';
+        
+        // Restore active state if this was the active contact
+        if (activeType === 'contact' && activeId === contactId) {
+          contactItem.classList.add('active');
+        }
+        
       contactItem.setAttribute('data-id', contact.id);
       contactItem.setAttribute('data-type', 'contact');
       contactItem.setAttribute('data-username', contact.username);
@@ -626,13 +974,34 @@ function displayContacts(contacts) {
       });
 
       usersList.appendChild(contactItem);
+      }
     });
-  }
+    
+    // Remove contacts that no longer exist
+    Object.values(existingContacts).forEach(element => {
+      element.remove();
+    });
   
-  // If no contacts and no groups, show "no results" message
-  if (usersList.children.length === 0) {
-    usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
   }
+    // Just update last messages without destroying/recreating DOM
+    contacts.forEach(contact => {
+      const contactId = contact.id.toString();
+      const contactElement = existingContacts[contactId];
+      
+      if (contactElement) {
+        // Update only the last message which might change frequently
+        const lastMessageElement = contactElement.querySelector('.last-message');
+        if (lastMessageElement && contact.last_message) {
+          const currentLastMessage = lastMessageElement.textContent;
+          const newLastMessage = contact.last_message || '';
+          
+          if (currentLastMessage !== newLastMessage) {
+            lastMessageElement.textContent = newLastMessage;
+          }
+        }
+      }
+    });
+  
 }
 
 // Display groups from data
@@ -640,15 +1009,97 @@ function displayGroups(groups) {
   const usersList = document.getElementById("users");
   if (!usersList) return;
   
-  // Remove existing groups
-  const existingGroups = usersList.querySelectorAll('.user.group');
-  existingGroups.forEach(item => item.remove());
+  // Remember currently active chat
+  const activeChat = usersList.querySelector('.user.active');
+  let activeId = null;
+  let activeType = null;
   
-  // Add groups
+  if (activeChat) {
+    activeId = activeChat.getAttribute('data-id');
+    activeType = activeChat.getAttribute('data-type');
+  }
+  
+  // Get existing groups
+  const existingGroups = {};
+  usersList.querySelectorAll('.user.group').forEach(item => {
+    const id = item.getAttribute('data-id');
+    existingGroups[id] = item;
+  });
+  
+  // Check if we need to rebuild
+  let needsRebuild = false;
+  
+  // Compare group IDs
+  const currentIds = Object.keys(existingGroups).sort();
+  const newIds = groups.map(group => group.id.toString()).sort();
+  
+  if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+    needsRebuild = true;
+  } else {
+    // Check if any group information has changed
+    groups.forEach(group => {
+      const groupId = group.id.toString();
+      const groupElement = existingGroups[groupId];
+      
+      if (groupElement) {
+        // Check group name
+        const nameElement = groupElement.querySelector('.user-name');
+        const currentName = nameElement ? nameElement.textContent : '';
+        const newName = group.name;
+        
+        if (currentName !== newName) {
+          needsRebuild = true;
+        }
+        
+        // Check admin status (might require UI changes)
+        const currentIsAdmin = groupElement.getAttribute('data-is-admin') === 'true';
+        const newIsAdmin = group.is_admin;
+        
+        if (currentIsAdmin !== newIsAdmin) {
+          needsRebuild = true;
+        }
+      }
+    });
+  }
+  
+  // Only rebuild if needed
+  if (needsRebuild) {
+    // Process all groups
   if (groups && groups.length > 0) {
     groups.forEach(group => {
+        const groupId = group.id.toString();
+        
+        // If group already exists, update it
+        if (existingGroups[groupId]) {
+          const groupElement = existingGroups[groupId];
+          
+          // Update only what might have changed
+          const nameElement = groupElement.querySelector('.user-name');
+          if (nameElement) {
+            nameElement.textContent = group.name;
+          }
+          
+          const lastMessageElement = groupElement.querySelector('.last-message');
+          if (lastMessageElement && group.last_message) {
+            lastMessageElement.textContent = group.last_message;
+          }
+          
+          // Update data attributes
+          groupElement.setAttribute('data-name', group.name);
+          groupElement.setAttribute('data-is-admin', group.is_admin);
+          
+          // Keep track that we've processed this group
+          delete existingGroups[groupId];
+        } else {
+          // Create new group element
       const groupItem = document.createElement('li');
       groupItem.className = 'user group';
+          
+          // Restore active state if this was the active group
+          if (activeType === 'group' && activeId === groupId) {
+            groupItem.classList.add('active');
+          }
+          
       groupItem.setAttribute('data-id', group.id);
       groupItem.setAttribute('data-type', 'group');
       groupItem.setAttribute('data-name', group.name);
@@ -666,12 +1117,36 @@ function displayGroups(groups) {
       });
 
       usersList.appendChild(groupItem);
+        }
     });
   }
+    
+    // Remove groups that no longer exist
+    Object.values(existingGroups).forEach(element => {
+      element.remove();
+    });
   
-  // If no contacts and no groups, show "no results" message
-  if (usersList.children.length === 0) {
-    usersList.innerHTML = '<li class="no-results">No contacts or groups yet</li>';
+  
+  }
+    // Just update last messages without destroying/recreating DOM
+    if (groups && groups.length > 0) {
+      groups.forEach(group => {
+        const groupId = group.id.toString();
+        const groupElement = existingGroups[groupId];
+        
+        if (groupElement) {
+          // Update only the last message which might change frequently
+          const lastMessageElement = groupElement.querySelector('.last-message');
+          if (lastMessageElement && group.last_message) {
+            const currentLastMessage = lastMessageElement.textContent;
+            const newLastMessage = group.last_message || '';
+            
+            if (currentLastMessage !== newLastMessage) {
+              lastMessageElement.textContent = newLastMessage;
+            }
+          }
+        }
+      });
   }
 }
 
@@ -683,19 +1158,21 @@ function loadContacts() {
     return;
   }
 
-
   fetch('/api/contacts')
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+        // Update currentContactIds for polling
+        currentContactIds = data.contacts.map(contact => contact.id);
+        
+        // Display contacts
         displayContacts(data.contacts);
-        // Also load groups
-        loadGroups();
       } else {
         usersList.innerHTML = '<li class="error">Failed to load contacts</li>';
       }
     })
     .catch(error => {
+      console.error('Error loading contacts:', error);
       usersList.innerHTML = '<li class="error">Failed to load contacts</li>';
     });
 }
@@ -716,6 +1193,10 @@ function loadGroups() {
     .then(response => response.json())
     .then(data => {
       if (data.success) {
+        // Update currentGroupIds for polling
+        currentGroupIds = data.groups.map(group => group.id);
+        
+        // Display groups
         displayGroups(data.groups);
       } else {
         // Only show error if there are no items at all
@@ -725,6 +1206,7 @@ function loadGroups() {
       }
     })
     .catch(error => {
+      console.error('Error loading groups:', error);
       // Only show error if there are no items at all
       if (usersList.children.length === 0) {
         usersList.innerHTML = '<li class="error">Failed to load groups</li>';
@@ -734,6 +1216,12 @@ function loadGroups() {
 
 // Open a chat
 function openChat(id, type, name) {
+  // If opening the same chat that's already active, do nothing
+  if ((type === 'contact' && currentContact === id) ||
+      (type === 'group' && currentGroup === id)) {
+    return;
+  }
+
   // Update current chat variables
   if (type === 'contact') {
     currentContact = id;
@@ -768,121 +1256,16 @@ function openChat(id, type, name) {
     messageInput.focus();
   }
 
-  // Load messages
+  // Load messages initially
   loadMessages(id, type);
 
-  // Clear existing refresh interval
-  if (messageRefreshInterval) {
-    clearInterval(messageRefreshInterval);
+  // Reset polling intervals for messages
+  if (pollingIntervals.messages) {
+    clearInterval(pollingIntervals.messages);
   }
-
-  // Set up auto-refresh for messages every 1 second
-  messageRefreshInterval = setInterval(() => {
-    if (currentContact || currentGroup) {
-      loadMessages(currentContact || currentGroup, currentContact ? 'contact' : 'group');
-    }
-  }, 1000);
-}
-
-// Load messages for current chat
-function loadMessages(id, type) {
-  const messagesContainer = document.getElementById("messages");
-
-  if (!messagesContainer) {
-    return;
-  }
-
-  let url;
-  if (type === 'contact') {
-    url = `/api/messages?contact_id=${id}`;
-  } else {
-    url = `/api/messages?group_id=${id}`;
-  }
-
-  fetch(url)
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        if (!data.messages || data.messages.length === 0) {
-          messagesContainer.innerHTML = '<div class="no-messages">No messages yet. Start the conversation!</div>';
-        } else {
-          messagesContainer.innerHTML = '';
-
-          data.messages.forEach(msg => {
-            const messageElement = document.createElement('div');
-            messageElement.className = msg.is_own_message ? 'message own' : 'message';
-            
-            // Add read class only to own messages that have been read by recipients
-            if (msg.is_own_message && msg.read_by && msg.read_by.length > 0) {
-              messageElement.classList.add('read');
-            }
-            
-            messageElement.setAttribute('data-id', msg.id);
-
-            // Create the message content element
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-
-            // Add message actions for own messages
-            if (msg.is_own_message) {
-              const messageActions = document.createElement('div');
-              messageActions.className = 'message-actions';
-              messageActions.innerHTML = `
-                <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
-                <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
-              `;
-              messageContent.appendChild(messageActions);
-
-              // Add edit button event listener
-              messageActions.querySelector('.edit-btn').addEventListener('click', function(e) {
-                e.stopPropagation();
-                openEditMessageModal(msg.id, msg.message);
-              });
-              
-              // Add delete button event listener
-              messageActions.querySelector('.delete-btn').addEventListener('click', function(e) {
-                e.stopPropagation();
-                openDeleteMessageModal(msg.id);
-              });
-            }
-
-            // Add sender name for messages not from the current user AND only in group chats
-            if (!msg.is_own_message && type === 'group') {
-              const senderNameDiv = document.createElement('div');
-              senderNameDiv.className = 'sender-name';
-              senderNameDiv.textContent = msg.sender_username;
-              messageContent.appendChild(senderNameDiv);
-            }
-
-            // Add message text
-            const messageTextDiv = document.createElement('div');
-            messageTextDiv.className = 'message-text';
-            messageTextDiv.textContent = msg.message;
-            messageContent.appendChild(messageTextDiv);
-
-            // Add edited label if needed
-            if (msg.edited) {
-              const editedLabel = document.createElement('span');
-              editedLabel.className = 'edited-label';
-              editedLabel.textContent = '(edited)';
-              messageContent.appendChild(editedLabel);
-            }
-
-            // Append the message content to the message div
-            messageElement.appendChild(messageContent);
-            messagesContainer.appendChild(messageElement);
-          });
-
-          // Scroll to bottom
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-      } else {
-        messagesContainer.innerHTML = '<div class="error-message">Failed to load messages</div>';
-      }
-    })
-    .catch(error => {
-      messagesContainer.innerHTML = '<div class="error-message">Failed to load messages</div>';
-    });
+  
+  // Start message polling
+  startMessagePolling();
 }
 
 // Format timestamp for display (removed from messages but keeping for other uses)
@@ -927,24 +1310,23 @@ function sendMessage() {
   // Clear input immediately for responsiveness
   messageInput.value = '';
 
-  // Use WebSocket for sending if available
-  if (socket && socket.connected) {
-    socket.emit('send_message', data);
-  } else {
-    // Fallback to traditional API call
-    sendMessageTraditional(data);
-  }
-}
-
-// Traditional API fallback for sending messages
-function sendMessageTraditional(data) {
-  const messageInput = document.getElementById("message-input");
-  const sendButton = document.getElementById("send-button");
+  // Create temporary message to display immediately
+  const tempId = 'temp-' + Date.now();
+  const tempMessage = {
+    id: tempId,
+    sender_id: currentUser.id,
+    sender_username: currentUser.username,
+    message: messageText,
+    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    is_own_message: true,
+    edited: false,
+    sending: true
+  };
   
-  // Disable input until message is sent
-  if (messageInput) messageInput.disabled = true;
-  if (sendButton) sendButton.disabled = true;
+  // Display temporary message
+  displayNewMessage(tempMessage);
 
+  // Send message via API
   fetch('/api/messages', {
     method: 'POST',
     headers: {
@@ -954,61 +1336,70 @@ function sendMessageTraditional(data) {
   })
     .then(response => response.json())
     .then(data => {
-      // Re-enable input
-      if (messageInput) messageInput.disabled = false;
-      if (sendButton) sendButton.disabled = false;
-      if (messageInput) messageInput.focus();
-
-      if (data.success) {
-        // Create message div for own message
-        displayNewMessage(data.message);
+    if (!data.success) {
+      // Show error on temporary message
+      const tempElement = document.querySelector(`.message[data-id="${tempId}"]`);
+      if (tempElement) {
+        tempElement.classList.add('error');
+        const messageContent = tempElement.querySelector('.message-content');
+        if (messageContent) {
+          const errorMsg = document.createElement('div');
+          errorMsg.className = 'error-text';
+          errorMsg.textContent = 'Failed to send';
+          messageContent.appendChild(errorMsg);
+        }
+      }
       } else {
-        alert("Failed to send message. Please try again.");
+      // Force a message reload to get the proper message and mark messages as read
+      if (currentContact) {
+        loadMessages(currentContact, 'contact');
+      } else if (currentGroup) {
+        loadMessages(currentGroup, 'group');
+      }
       }
     })
     .catch(error => {
-      // Re-enable input
-      if (messageInput) messageInput.disabled = false;
-      if (sendButton) sendButton.disabled = false;
-
-      alert("Failed to send message. Please try again.");
-    });
+    // Show error on temporary message
+    const tempElement = document.querySelector(`.message[data-id="${tempId}"]`);
+    if (tempElement) {
+      tempElement.classList.add('error');
+      const messageContent = tempElement.querySelector('.message-content');
+      if (messageContent) {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'error-text';
+        errorMsg.textContent = 'Failed to send';
+        messageContent.appendChild(errorMsg);
+      }
+    }
+  });
 }
 
-// Mark message as read
+// Mark a message as read
 function markMessageAsRead(messageId) {
   fetch(`/api/messages/${messageId}/read`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     }
-  }).then(response => response.json())
-    .then(data => {
-      // Optionally handle response
     })
+  .then(response => response.json())
     .catch(error => {
-      // Optionally handle error
+    console.error("Error marking message as read:", error);
     });
 }
 
-// Contact event notifications
+// Notify that a contact has changed
 function notifyContactChanged(contactId) {
-  if (socket && socket.connected) {
-    socket.emit('contact_changed', { contact_id: contactId });
-  } else {
-    // Fallback: just reload contacts
+  // Immediately load contacts to reflect changes
+  console.log("Contact changed, reloading contacts list");
     loadContacts();
-  }
 }
 
-// Group event notifications
+// Notify that a group has changed
 function notifyGroupChanged(groupId) {
-  if (socket && socket.connected) {
-    socket.emit('group_changed', { group_id: groupId });
-  } else {
-    // Fallback: just reload groups
+  // Immediately load groups to reflect changes
+  console.log("Group changed, reloading groups list");
     loadGroups();
-  }
 }
 
 // Initialize contact settings modal
@@ -1182,10 +1573,6 @@ function deleteContact() {
   const contactId = document.getElementById("contact-id").value;
   const errorMsg = document.getElementById("contact-settings-error");
 
-  if (!confirm("Are you sure you want to delete this contact?")) {
-    return;
-  }
-
   fetch(`/api/contacts/${contactId}`, {
     method: 'DELETE',
     headers: {
@@ -1319,7 +1706,51 @@ function createGroupSettingsModalElement() {
   const modal = document.createElement('div');
   modal.id = "group-settings-modal";
   modal.className = "modal";
-  // No need to set style.display here as it's handled by CSS
+  
+  // Add styles to match the image
+  const style = document.createElement('style');
+  style.textContent = `
+    #group-settings-modal .modal-content {
+      max-width: 300px;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    #admin-title {
+      text-align: center;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+    #member-settings h3 {
+      text-align: center;
+      margin-bottom: 15px;
+      font-weight: bold;
+    }
+    .participants-list {
+      background: #f5f5f5;
+      border: 1px solid #999;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .participant-item {
+      padding: 8px 5px;
+      border-bottom: 1px solid #999;
+    }
+    .participant-item:last-child {
+      border-bottom: none;
+    }
+    #leave-group-btn {
+      background-color: #ff3b30;
+      width: 100%;
+      padding: 10px;
+      font-weight: bold;
+      text-transform: none;
+    }
+  `;
+  document.head.appendChild(style);
 
   modal.innerHTML = `
     <div class="modal-content">
@@ -1352,8 +1783,7 @@ function createGroupSettingsModalElement() {
       
       <!-- Regular member view -->
       <div id="member-settings" style="display: none;">
-        <h3>Admin</h3>
-        <div id="group-admin" class="admin-info"></div>
+        <h3 id="admin-title">Admin: <span id="admin-name"></span></h3>
         <h3>Participants</h3>
         <div id="group-participants" class="participants-list"></div>
         <div class="modal-actions">
@@ -1512,26 +1942,17 @@ function openGroupSettings(groupId) {
           document.getElementById("admin-settings").style.display = "none";
           document.getElementById("member-settings").style.display = "block";
           
-          // Show user header, hide admin header
+          // Hide all headers
           modal.querySelector(".search-header.admin-only").style.display = "none";
-          modal.querySelector(".search-header.user-only").style.display = "flex";
+          modal.querySelector(".search-header.user-only").style.display = "none";
           
-          // Set group name label
-          document.getElementById("group-name-label").textContent = group.name;
-
-          // Display admin info
-          const adminContainer = document.getElementById("group-admin");
-          adminContainer.innerHTML = '';
-
+          // Find the admin
           const admins = group.members.filter(member => member.is_admin);
-          admins.forEach(admin => {
-            const adminItem = document.createElement('div');
-            adminItem.className = 'admin-item';
-            adminItem.textContent = admin.username;
-            adminContainer.appendChild(adminItem);
-          });
+          if (admins.length > 0) {
+            document.getElementById("admin-name").textContent = admins[0].username;
+          }
 
-          // Display participants
+          // Display participants list
           const participantsContainer = document.getElementById("group-participants");
           participantsContainer.innerHTML = '';
 
@@ -1877,10 +2298,6 @@ function updateGroup() {
 
 // Delete group
 function deleteGroup() {
-  if (!confirm("Are you sure you want to delete this group?")) {
-    return;
-  }
-
   const errorMsg = document.getElementById("group-settings-error");
   const groupId = currentGroup;
 
@@ -1928,10 +2345,6 @@ function deleteGroup() {
 
 // Leave group
 function leaveGroup() {
-  if (!confirm("Are you sure you want to leave this group?")) {
-    return;
-  }
-
   const errorMsg = document.getElementById("group-settings-error");
   const groupId = currentGroup;
 

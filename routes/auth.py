@@ -86,6 +86,12 @@ def logout():
     session.pop('username', None)
     return jsonify({"success": True})
 
+@auth.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.pop('user_id', None)
+    session.pop('username', None)
+    return jsonify({"success": True})
+
 @auth.route('/api/me', methods=['GET'])
 def get_current_user():
     if 'user_id' not in session or 'username' not in session:

@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from flask import Flask
 from flask_cors import CORS
 from flask_mail import Mail
-from flask_socketio import SocketIO
 from models import db
 from config import Config
 
@@ -17,9 +16,6 @@ from routes.chat import chat as chat_blueprint
 from routes.contacts import contacts as contacts_blueprint
 from routes.groups import groups as groups_blueprint
 from routes.ai import ai as ai_blueprint
-
-# Initialize Flask-SocketIO
-socketio = SocketIO(cors_allowed_origins="*", async_mode='gevent')
 
 def create_app(config_class=Config):
     # Initialize Flask app
@@ -38,7 +34,6 @@ def create_app(config_class=Config):
     CORS(app)
     db.init_app(app)
     mail = Mail(app)
-    socketio.init_app(app, cors_allowed_origins="*")
     
     # Register blueprints
     app.register_blueprint(auth_blueprint)
@@ -51,12 +46,8 @@ def create_app(config_class=Config):
     with app.app_context():
         db.create_all()
     
-    # Import socket events
-    from socket_events import register_socket_events
-    register_socket_events(socketio)
-    
     return app
 
 if __name__ == '__main__':
     app = create_app()
-    socketio.run(app, debug=True, port=8000, host='0.0.0.0')
+    app.run(debug=True, port=8000, host='0.0.0.0')

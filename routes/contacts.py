@@ -131,4 +131,63 @@ def delete_contact(contact_id):
     db.session.delete(contact)
     db.session.commit()
 
-    return jsonify({"success": True, "message": "Contact deleted successfully"}) 
+    return jsonify({"success": True, "message": "Contact deleted successfully"})
+
+@contacts.route('/api/contacts/poll', methods=['GET'])
+def poll_contacts():
+    """
+    Endpoint for polling contact list changes since last check
+    """
+    if 'user_id' not in session:
+        return jsonify({"success": False, "message": "Not logged in"}), 401
+
+    user_id = session['user_id']
+    last_poll = request.args.get('last_poll')
+    
+    # Get current contacts
+    contacts_data = db.session.query(
+        User, Contact.display_name
+    ).join(
+        Contact, Contact.contact_id == User.id
+    ).filter(
+        Contact.user_id == user_id
+    ).all()
+    
+    current_contacts = [
+        {
+            "id": user.id,
+            "username": user.username,
+            "display_name": display_name or user.username
+        }
+        for user, display_name in contacts_data
+    ]
+    
+    # Get current contact IDs for simple comparison
+    current_contact_ids = [contact["id"] for contact in current_contacts]
+    
+    # If last_poll contains a comma-separated list of previous contact IDs,
+    # we can determine additions and removals
+    changes = {"added": [], "updated": [], "removed": []}
+    
+    if last_poll:
+        try:
+            # Parse the previous contact IDs
+            previous_contact_ids = [int(id_str) for id_str in last_poll.split(',')]
+            
+            # Find removed contacts (in previous but not current)
+            removed_ids = [id for id in previous_contact_ids if id not in current_contact_ids]
+            changes["removed"] = removed_ids
+            
+            # Find added contacts (in current but not previous)
+            added_contacts = [contact for contact in current_contacts if contact["id"] not in previous_contact_ids]
+            changes["added"] = added_contacts
+            
+        except ValueError:
+            # If there's an error parsing the IDs, just return the current list
+            pass
+    
+    return jsonify({
+        "success": True,
+        "contacts": current_contacts,
+        "changes": changes
+    }) 
