@@ -408,13 +408,6 @@ function displayNewMessage(message) {
     messageTextDiv.textContent = message.message;
     messageContent.appendChild(messageTextDiv);
     
-    // Add edited label if needed
-    if (message.edited) {
-      const editedLabel = document.createElement('span');
-      editedLabel.className = 'edited-label';
-      editedLabel.textContent = '(edited)';
-      messageContent.appendChild(editedLabel);
-    }
     
     // Add to DOM
     messageDiv.appendChild(messageContent);
