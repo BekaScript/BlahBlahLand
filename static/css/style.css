@@ -1026,23 +1026,6 @@
     position: relative;
 }
 
-#openSideMenu {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    cursor: pointer;
-    margin-right: 15px;
-}
-
-.burger-line {
-    width: 24px;
-    height: 2px;
-    background-color: #000;
-    margin: 2px 0;
-}
-
 /* Add a class for AI messages to support the copy button positioning */
 .ai-message {
   position: relative;
