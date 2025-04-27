@@ -1543,6 +1543,13 @@ function updateContactDisplayName() {
         hideContactSettingsModal();
         errorMsg.textContent = "";
         notifyContactChanged(contactId);
+        // Update chat header if this contact is currently open
+        if (currentContact && currentContact.toString() === contactId.toString()) {
+          const chatHeaderTitle = document.getElementById('chat-header-title');
+          if (chatHeaderTitle) {
+            chatHeaderTitle.textContent = displayName || document.getElementById("contact-username").textContent;
+          }
+        }
       } else {
         errorMsg.textContent = data.message || "Failed to update contact";
       }
@@ -2265,11 +2272,12 @@ function updateGroup() {
         hideGroupSettingsModal();
         errorMsg.textContent = "";
         notifyGroupChanged(currentGroup);
-
-        // Update chat header if this is the current group
-        const chatHeaderTitle = document.getElementById('chat-header-title');
-        if (chatHeaderTitle && currentGroup) {
-          chatHeaderTitle.textContent = groupName;
+        // Update chat header if this group is currently open
+        if (currentGroup) {
+          const chatHeaderTitle = document.getElementById('chat-header-title');
+          if (chatHeaderTitle) {
+            chatHeaderTitle.textContent = groupName;
+          }
         }
       } else {
         errorMsg.textContent = data.message || "Failed to update group";
