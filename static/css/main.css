@@ -225,6 +225,17 @@ body {
   color: white;
 }
 
+#chat-header-left {
+  display: flex;
+  align-items: center;
+}
+
+#chat-header-title {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 600;
+}
+
 #chat-header-right {
   display: flex;
   gap: 15px;

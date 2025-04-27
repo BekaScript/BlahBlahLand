@@ -403,8 +403,8 @@ function displayNewMessage(message) {
       });
     }
     
-    // Add sender name for group messages
-    if (!message.is_own_message && currentGroup) {
+    // Add sender name for group messages from others
+    if (!message.is_own_message && currentGroup && message.sender_username) {
       const senderNameDiv = document.createElement('div');
       senderNameDiv.className = 'sender-name';
       senderNameDiv.textContent = message.sender_username;
