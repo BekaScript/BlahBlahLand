@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - BlahBlahLand</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+      <div class="admin-logo">
+        <h2>Admin Panel</h2>
+      </div>
+      <nav class="admin-nav">
+        <ul>
+          <li class="nav-item active" data-section="dashboard">
+            <span>Dashboard</span>
+          </li>
+          <li class="nav-item" data-section="users">
+            <span>User Management</span>
+          </li>
+          <li class="nav-item" data-section="content">
+            <span>Content Moderation</span>
+          </li>
+          <li class="nav-item" data-section="settings">
+            <span>Settings</span>
+          </li>
+          <li class="nav-item logout">
+            <span>Logout</span>
+          </li>
+        </ul>
+      </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-main">
+      <!-- Dashboard Section -->
+      <div class="admin-section active" id="dashboard-section">
+        <h1>Dashboard</h1>
+        <div class="stats-container">
+          <div class="stat-card">
+            <h3>Total Users</h3>
+            <p id="total-users-count">Loading...</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Groups</h3>
+            <p id="total-groups-count">Loading...</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Messages</h3>
+            <p id="total-messages-count">Loading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Management Section -->
+      <div class="admin-section" id="users-section">
+        <h1>User Management</h1>
+        <div class="admin-card">
+          <div class="card-header">
+            <h2>All Users</h2>
+            <div class="search-container">
+              <input type="text" id="user-search" placeholder="Search users...">
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <!-- User data will be loaded here -->
+                <tr>
+                  <td colspan="4" class="loading-data">Loading users data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content Moderation Section -->
+      <div class="admin-section" id="content-section">
+        <h1>Content Moderation</h1>
+        <div class="admin-card">
+          <h2>Flagged Content</h2>
+          <p>Content moderation features coming soon.</p>
+        </div>
+      </div>
+
+      <!-- Settings Section -->
+      <div class="admin-section" id="settings-section">
+        <h1>Admin Settings</h1>
+        <div class="admin-card">
+          <h2>Content Filtering</h2>
+          <div class="setting-group">
+            <h3>Blocked Hashtags</h3>
+            <textarea id="blocked-hashtags" placeholder="Enter hashtags to block, separated by commas"></textarea>
+            <button id="save-hashtags" class="btn primary">Save</button>
+          </div>
+          <div class="setting-group">
+            <h3>AI Content Moderation</h3>
+            <label class="switch">
+              <input type="checkbox" id="ai-moderation-toggle">
+              <span class="slider round"></span>
+            </label>
+            <span>Enable AI moderation of message content</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ban User Modal -->
+  <div id="ban-user-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h2>Ban User</h2>
+      <p>Are you sure you want to ban <span id="ban-username"></span>?</p>
+      <div class="modal-actions">
+        <button id="confirm-ban" class="btn danger">Ban User</button>
+        <button id="cancel-ban" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete User Modal -->
+  <div id="delete-user-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h2>Delete User</h2>
+      <p>Are you sure you want to delete <span id="delete-username"></span>?</p>
+      <p class="warning">This action cannot be undone. All user data will be permanently removed.</p>
+      <div class="modal-actions">
+        <button id="confirm-delete" class="btn danger">Delete User</button>
+        <button id="cancel-delete" class="btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html> 

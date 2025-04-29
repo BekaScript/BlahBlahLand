@@ -6,4 +6,5 @@ db = SQLAlchemy()
 from .user import User
 from .contact import Contact
 from .message import Message
-from .group import Group, GroupMember 
+from .group import Group, GroupMember
+from .setting import Setting 
