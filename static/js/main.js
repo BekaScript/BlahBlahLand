@@ -270,15 +270,6 @@ function startUpdatePolling() {
                 const textEl = messageEl.querySelector('.message-text');
                 if (textEl && textEl.textContent !== info.message) {
                   textEl.textContent = info.message;
-                  
-                  // Add or update edited label
-                  let editedLabel = messageEl.querySelector('.edited-label');
-                  if (!editedLabel) {
-                    editedLabel = document.createElement('span');
-                    editedLabel.className = 'edited-label';
-                    editedLabel.textContent = '(edited)';
-                    messageEl.querySelector('.message-content').appendChild(editedLabel);
-                  }
                 }
               }
               
@@ -403,8 +394,8 @@ function displayNewMessage(message) {
       });
     }
     
-    // Add sender name for group messages
-    if (!message.is_own_message && currentGroup) {
+    // Add sender name for group messages from others
+    if (!message.is_own_message && currentGroup && message.sender_username) {
       const senderNameDiv = document.createElement('div');
       senderNameDiv.className = 'sender-name';
       senderNameDiv.textContent = message.sender_username;
@@ -417,13 +408,6 @@ function displayNewMessage(message) {
     messageTextDiv.textContent = message.message;
     messageContent.appendChild(messageTextDiv);
     
-    // Add edited label if needed
-    if (message.edited) {
-      const editedLabel = document.createElement('span');
-      editedLabel.className = 'edited-label';
-      editedLabel.textContent = '(edited)';
-      messageContent.appendChild(editedLabel);
-    }
     
     // Add to DOM
     messageDiv.appendChild(messageContent);
@@ -1559,6 +1543,13 @@ function updateContactDisplayName() {
         hideContactSettingsModal();
         errorMsg.textContent = "";
         notifyContactChanged(contactId);
+        // Update chat header if this contact is currently open
+        if (currentContact && currentContact.toString() === contactId.toString()) {
+          const chatHeaderTitle = document.getElementById('chat-header-title');
+          if (chatHeaderTitle) {
+            chatHeaderTitle.textContent = displayName || document.getElementById("contact-username").textContent;
+          }
+        }
       } else {
         errorMsg.textContent = data.message || "Failed to update contact";
       }
@@ -2281,11 +2272,12 @@ function updateGroup() {
         hideGroupSettingsModal();
         errorMsg.textContent = "";
         notifyGroupChanged(currentGroup);
-
-        // Update chat header if this is the current group
-        const chatHeaderTitle = document.getElementById('chat-header-title');
-        if (chatHeaderTitle && currentGroup) {
-          chatHeaderTitle.textContent = groupName;
+        // Update chat header if this group is currently open
+        if (currentGroup) {
+          const chatHeaderTitle = document.getElementById('chat-header-title');
+          if (chatHeaderTitle) {
+            chatHeaderTitle.textContent = groupName;
+          }
         }
       } else {
         errorMsg.textContent = data.message || "Failed to update group";
@@ -2543,17 +2535,6 @@ function updateMessage(messageId, newText) {
         const messageElement = document.querySelector(`.message[data-id="${messageId}"] .message-text`);
         if (messageElement) {
           messageElement.textContent = newText;
-          
-          // Add edited label if not already present
-          const messageContent = messageElement.closest('.message-content');
-          if (messageContent) {
-            if (!messageContent.querySelector('.edited-label')) {
-              const editedLabel = document.createElement('span');
-              editedLabel.className = 'edited-label';
-              editedLabel.textContent = '(edited)';
-              messageContent.appendChild(editedLabel);
-            }
-          }
         }
       } else {
         alert("Failed to update message. Please try again.");

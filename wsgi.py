@@ -1,4 +1,4 @@
-from app import create_app, socketio
+from app import create_app
 
 # Create application instance
 application = create_app()
@@ -7,5 +7,5 @@ application = create_app()
 app = application
 
 if __name__ == "__main__":
-    socketio.run(application, host='0.0.0.0', port=8000) 
+    app.run(host='0.0.0.0', port=8000) 
     
