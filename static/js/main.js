@@ -1,4 +1,45 @@
 // Initialize all components 
+document.addEventListener('DOMContentLoaded', function() {
+  // Add custom CSS for message translations
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Translation styling */
+    .translated-indicator {
+      font-size: 0.8em;
+      color: #1a73e8;
+      font-style: italic;
+      margin-top: 5px;
+      display: block;
+    }
+    
+    /* Special styling for the button */
+    .message:not(.own) .message-actions .translate-btn {
+      background-color: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    
+    .message:not(.own) .message-actions .translate-btn:hover {
+      background-color: #e3f2fd;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    
+    .message:not(.own) .message-actions .translate-btn img {
+      width: 16px;
+      height: 16px;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Initialize UI
+  initUI();
+  
+  // Load any saved translations after page load
+  setTimeout(() => {
+    loadTranslationsFromStorage();
+  }, 1000);
+});
+
+// Initialize all components 
 function initUI() {
   initSidebar();
   initAIChat();
@@ -34,8 +75,6 @@ function initUI() {
   checkLoginStatus();
 }
 
-document.addEventListener("DOMContentLoaded", initUI);
-
 // Polling variables
 let pollingIntervals = {
   messages: null,
@@ -45,6 +84,7 @@ let pollingIntervals = {
 
 let currentContactIds = [];
 let currentGroupIds = [];
+let displayedMessageIds = []; // Initialize array to track displayed message IDs
 
 function initPolling() {
   console.log('Initializing polling...');
@@ -190,7 +230,7 @@ function loadMessages(id, type) {
                 if (msgEl) {
                   // Check message content
                   const messageText = msgEl.querySelector('.message-text');
-                  if (messageText && messageText.textContent !== msg.message) {
+                  if (messageText && messageText.textContent !== msg.message && !msgEl.hasAttribute('data-translated')) {
                     needsRebuild = true;
                   }
                   
@@ -212,15 +252,58 @@ function loadMessages(id, type) {
           
           // Only rebuild if needed
           if (needsRebuild) {
+            // Save translation state of existing messages
+            const translationState = {};
+            messagesContainer.querySelectorAll('.message[data-translated]').forEach(el => {
+              const msgId = el.getAttribute('data-id');
+              translationState[msgId] = {
+                originalText: el.getAttribute('data-original-text'),
+                translatedText: el.querySelector('.message-text').textContent
+              };
+            });
+            
             messagesContainer.innerHTML = '';
             
             // Add all messages
             data.messages.forEach(msg => {
               displayNewMessage(msg);
+              
+              // Restore translation state if applicable
+              const msgId = msg.id.toString();
+              if (translationState[msgId]) {
+                const newMsgEl = messagesContainer.querySelector(`.message[data-id="${msgId}"]`);
+                if (newMsgEl) {
+                  const messageTextEl = newMsgEl.querySelector('.message-text');
+                  
+                  // Set message as translated
+                  newMsgEl.setAttribute('data-translated', 'true');
+                  messageTextEl.textContent = translationState[msgId].translatedText;
+                  
+                  // Add translated indicator
+                  const translatedIndicator = document.createElement('div');
+                  translatedIndicator.className = 'translated-indicator';
+                  
+                  // We don't know the exact source language at this point, 
+                  // but we can determine based on content
+                  const hasCyrillic = /[а-яА-Я]/.test(translationState[msgId].originalText);
+                  const sourceLanguage = hasCyrillic ? 'Russian' : 'English';
+                  
+                  translatedIndicator.textContent = `translated`;
+                  newMsgEl.querySelector('.message-content').appendChild(translatedIndicator);
+                  
+                  // Also update our localStorage
+                  saveTranslationToStorage(msgId, translationState[msgId].originalText, translationState[msgId].translatedText);
+                }
+              }
             });
             
             // Scroll to bottom
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Apply any saved translations from localStorage
+            setTimeout(() => {
+              loadTranslationsFromStorage();
+            }, 100);
           } else {
             // Just update read status without triggering reflow
             data.messages.forEach(msg => {
@@ -357,42 +440,65 @@ function displayNewMessage(message) {
     const messageDiv = document.createElement('div');
     messageDiv.className = message.is_own_message ? 'message own' : 'message';
     messageDiv.setAttribute('data-id', message.id);
+    messageDiv.setAttribute('data-original-text', message.message);
     
     // Add read class if applicable
     if (message.is_own_message && message.read_by && message.read_by.length > 0) {
       messageDiv.classList.add('read');
     }
   
-  // Add sending class if applicable
-  if (message.sending) {
-    messageDiv.classList.add('sending');
+    // Add sending class if applicable
+    if (message.sending) {
+      messageDiv.classList.add('sending');
+    }
+    
+    // Add error class if applicable
+    if (message.error) {
+      messageDiv.classList.add('error');
     }
     
     // Create message content
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
     
-    // Add action buttons for own messages
+    // Add action buttons for all messages (own and received)
+    const messageActions = document.createElement('div');
+    messageActions.className = 'message-actions';
+    
     if (message.is_own_message) {
-      const messageActions = document.createElement('div');
-      messageActions.className = 'message-actions';
+      // For own messages, show translate, edit, and delete (translate first)
       messageActions.innerHTML = `
+        <button class="translate-btn" title="Translate Message"><img src="/static/images/translation.png" alt="Translate" class="action-icon"></button>
         <button class="edit-btn" title="Edit Message"><img src="/static/images/pen.png" alt="Edit" class="action-icon"></button>
         <button class="delete-btn" title="Delete Message"><img src="/static/images/bin.png" alt="Delete" class="action-icon"></button>
       `;
-      messageContent.appendChild(messageActions);
       
-      // Add event listeners
+      // Add event listeners for own messages
       messageActions.querySelector('.edit-btn').addEventListener('click', function(e) {
         e.stopPropagation();
-        openEditMessageModal(message.id, message.message);
+        // Get the current visible text instead of relying on the original message data
+        const currentText = messageDiv.querySelector('.message-text').textContent;
+        openEditMessageModal(message.id, currentText);
       });
       
       messageActions.querySelector('.delete-btn').addEventListener('click', function(e) {
         e.stopPropagation();
         openDeleteMessageModal(message.id);
       });
+    } else {
+      // For received messages, only show translate
+      messageActions.innerHTML = `
+        <button class="translate-btn" title="Translate Message"><img src="/static/images/translation.png" alt="Translate" class="action-icon"></button>
+      `;
     }
+    
+    // Add translate event listener for all messages
+    messageActions.querySelector('.translate-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      translateMessage(messageDiv);
+    });
+    
+    messageContent.appendChild(messageActions);
     
     // Add sender name for group messages from others
     if (!message.is_own_message && currentGroup && message.sender_username) {
@@ -408,13 +514,25 @@ function displayNewMessage(message) {
     messageTextDiv.textContent = message.message;
     messageContent.appendChild(messageTextDiv);
     
+    // Add error message if applicable
+    if (message.error && message.errorMessage) {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-text';
+      errorDiv.textContent = message.errorMessage;
+      messageContent.appendChild(errorDiv);
+    }
     
     // Add to DOM
     messageDiv.appendChild(messageContent);
-  
-  // Add to message container
-  const messagesContainer = document.getElementById("messages");
+    
+    // Add to message container
+    const messagesContainer = document.getElementById("messages");
     messagesContainer.appendChild(messageDiv);
+    
+    // Track displayed message ID for polling
+    if (!displayedMessageIds.includes(message.id.toString())) {
+      displayedMessageIds.push(message.id.toString());
+    }
     
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1215,6 +1333,9 @@ function openChat(id, type, name) {
     currentContact = null;
   }
 
+  // Reset displayed message tracking
+  displayedMessageIds = [];
+
   // Highlight selected chat
   document.querySelectorAll('#users .user').forEach(el => {
     el.classList.remove('active');
@@ -1250,6 +1371,11 @@ function openChat(id, type, name) {
   
   // Start message polling
   startMessagePolling();
+  
+  // Load saved translations for this chat
+  setTimeout(() => {
+    loadTranslationsFromStorage();
+  }, 500); // Small delay to ensure messages are loaded first
 }
 
 // Format timestamp for display (removed from messages but keeping for other uses)
@@ -1291,24 +1417,8 @@ function sendMessage() {
     };
   }
 
-  // Clear input immediately for responsiveness
-  messageInput.value = '';
-
-  // Create temporary message to display immediately
-  const tempId = 'temp-' + Date.now();
-  const tempMessage = {
-    id: tempId,
-    sender_id: currentUser.id,
-    sender_username: currentUser.username,
-    message: messageText,
-    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-    is_own_message: true,
-    edited: false,
-    sending: true
-  };
-  
-  // Display temporary message
-  displayNewMessage(tempMessage);
+  // Remove error styling if previously applied
+  messageInput.classList.remove('error');
 
   // Send message via API
   fetch('/api/messages', {
@@ -1320,42 +1430,54 @@ function sendMessage() {
   })
     .then(response => response.json())
     .then(data => {
-    if (!data.success) {
-      // Show error on temporary message
-      const tempElement = document.querySelector(`.message[data-id="${tempId}"]`);
-      if (tempElement) {
-        tempElement.classList.add('error');
-        const messageContent = tempElement.querySelector('.message-content');
-        if (messageContent) {
-          const errorMsg = document.createElement('div');
-          errorMsg.className = 'error-text';
-          errorMsg.textContent = 'Failed to send';
-          messageContent.appendChild(errorMsg);
+      if (!data.success) {
+        // Check if it's a content moderation error
+        if (data.message === "Message contains inappropriate content") {
+          // Add error class to message input
+          messageInput.classList.add('error');
+          
+          // Show generic alert for all inappropriate content regardless of details
+          alert("The message contains inappropriate content");
+          
+          // Do NOT clear the input field - leave the message there for the user to edit
+        } else {
+          // For other errors, show a temporary error message
+          const tempId = 'temp-' + Date.now();
+          const tempMessage = {
+            id: tempId,
+            sender_id: currentUser.id,
+            sender_username: currentUser.username,
+            message: messageText,
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            is_own_message: true,
+            edited: false,
+            error: true,
+            errorMessage: data.message || 'Failed to send message'
+          };
+          
+          // Display temporary error message
+          displayNewMessage(tempMessage);
+          
+          // Clear the input field for non-hashtag errors
+          messageInput.value = '';
         }
-      }
       } else {
-      // Force a message reload to get the proper message and mark messages as read
-      if (currentContact) {
-        loadMessages(currentContact, 'contact');
-      } else if (currentGroup) {
-        loadMessages(currentGroup, 'group');
-      }
+        // Message sent successfully, clear input
+        messageInput.value = '';
+        
+        // Force a message reload to get the proper message and mark messages as read
+        if (currentContact) {
+          loadMessages(currentContact, 'contact');
+        } else if (currentGroup) {
+          loadMessages(currentGroup, 'group');
+        }
       }
     })
     .catch(error => {
-    // Show error on temporary message
-    const tempElement = document.querySelector(`.message[data-id="${tempId}"]`);
-    if (tempElement) {
-      tempElement.classList.add('error');
-      const messageContent = tempElement.querySelector('.message-content');
-      if (messageContent) {
-        const errorMsg = document.createElement('div');
-        errorMsg.className = 'error-text';
-        errorMsg.textContent = 'Failed to send';
-        messageContent.appendChild(errorMsg);
-      }
-    }
-  });
+      // Show generic error message
+      alert("Failed to send message. Please try again.");
+      console.error("Error sending message:", error);
+    });
 }
 
 // Mark a message as read
@@ -2532,9 +2654,16 @@ function updateMessage(messageId, newText) {
     .then(data => {
       if (data.success) {
         // Update message in UI
-        const messageElement = document.querySelector(`.message[data-id="${messageId}"] .message-text`);
+        const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
         if (messageElement) {
-          messageElement.textContent = newText;
+          // Update the message text
+          const messageTextElement = messageElement.querySelector('.message-text');
+          if (messageTextElement) {
+            messageTextElement.textContent = newText;
+          }
+          
+          // Update the data-original-text attribute so edit button shows the correct text
+          messageElement.setAttribute('data-original-text', newText);
         }
       } else {
         alert("Failed to update message. Please try again.");
@@ -2594,4 +2723,267 @@ function openAddToGroupModal(groupId) {
 
   // Show modal
   modal.style.display = "block";
+}
+
+// Translate a message between English and Russian
+function translateMessage(messageElement) {
+  // Get the message ID and text
+  const messageId = messageElement.getAttribute('data-id');
+  const messageTextElement = messageElement.querySelector('.message-text');
+  const messageText = messageTextElement.textContent;
+  const isOwnMessage = messageElement.classList.contains('own');
+  
+  // If message is already translated and it's not the user's own message, revert to original
+  if (messageElement.hasAttribute('data-translated') && !isOwnMessage) {
+    // Revert to original text
+    messageTextElement.textContent = messageElement.getAttribute('data-original-text');
+    messageElement.removeAttribute('data-translated');
+    
+    // Remove translated indicator if exists
+    const translatedIndicator = messageElement.querySelector('.translated-indicator');
+    if (translatedIndicator) {
+      translatedIndicator.remove();
+    }
+    
+    // Also remove from localStorage
+    removeTranslationFromStorage(messageId);
+    
+    return;
+  }
+  
+  // Store original text if not already stored
+  if (!messageElement.getAttribute('data-original-text')) {
+    messageElement.setAttribute('data-original-text', messageText);
+  }
+  
+  // Show loading indicator
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.className = 'translation-loading';
+  loadingIndicator.textContent = 'Translating...';
+  messageElement.appendChild(loadingIndicator);
+  
+  // Call the translation API
+  fetch('/api/translate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: messageText
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    // Remove loading indicator
+    loadingIndicator.remove();
+    
+    if (data.success) {
+      if (isOwnMessage) {
+        // For own messages, open edit message modal with translated text
+        openEditMessageModalWithTranslation(messageId, messageText, data.translated_text);
+      } else {
+        // For other messages, update directly in the bubble
+        // Update the message text with the translation
+        messageTextElement.textContent = data.translated_text;
+        
+        // Mark message as translated
+        messageElement.setAttribute('data-translated', 'true');
+        
+        // Add translated indicator
+        const translatedIndicator = document.createElement('div');
+        translatedIndicator.className = 'translated-indicator';
+        translatedIndicator.textContent = `translated`;
+        messageElement.querySelector('.message-content').appendChild(translatedIndicator);
+        
+        // Save translation to localStorage for persistence across refreshes
+        saveTranslationToStorage(messageId, messageText, data.translated_text);
+      }
+    } else {
+      // Show error
+      alert('Translation failed: ' + (data.message || 'Unknown error'));
+    }
+  })
+  .catch(error => {
+    // Remove loading indicator
+    loadingIndicator.remove();
+    
+    // Show error
+    console.error('Translation error:', error);
+    alert('Translation failed. Please try again.');
+  });
+}
+
+// Helper function to save translation to localStorage
+function saveTranslationToStorage(messageId, originalText, translatedText) {
+  try {
+    // Get existing translations or initialize empty object
+    let savedTranslations = JSON.parse(localStorage.getItem('messageTranslations') || '{}');
+    
+    // Add or update this translation
+    savedTranslations[messageId] = {
+      originalText: originalText,
+      translatedText: translatedText,
+      timestamp: Date.now()
+    };
+    
+    // Save back to localStorage
+    localStorage.setItem('messageTranslations', JSON.stringify(savedTranslations));
+  } catch (error) {
+    console.error('Error saving translation to localStorage:', error);
+  }
+}
+
+// Helper function to remove translation from localStorage
+function removeTranslationFromStorage(messageId) {
+  try {
+    // Get existing translations
+    let savedTranslations = JSON.parse(localStorage.getItem('messageTranslations') || '{}');
+    
+    // Remove this translation if it exists
+    if (savedTranslations[messageId]) {
+      delete savedTranslations[messageId];
+      
+      // Save back to localStorage
+      localStorage.setItem('messageTranslations', JSON.stringify(savedTranslations));
+    }
+  } catch (error) {
+    console.error('Error removing translation from localStorage:', error);
+  }
+}
+
+// Load translations from localStorage when displaying messages
+function loadTranslationsFromStorage() {
+  try {
+    // Get saved translations
+    const savedTranslations = JSON.parse(localStorage.getItem('messageTranslations') || '{}');
+    
+    // Apply saved translations to any matching messages in the DOM
+    for (const [messageId, translation] of Object.entries(savedTranslations)) {
+      const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
+      
+      if (messageElement) {
+        const messageTextElement = messageElement.querySelector('.message-text');
+        
+        if (messageTextElement) {
+          // Store original text if needed
+          if (!messageElement.getAttribute('data-original-text')) {
+            messageElement.setAttribute('data-original-text', messageTextElement.textContent);
+          }
+          
+          // Apply the translation
+          messageTextElement.textContent = translation.translatedText;
+          messageElement.setAttribute('data-translated', 'true');
+          
+          // Add translated indicator if it doesn't exist
+          if (!messageElement.querySelector('.translated-indicator')) {
+            const translatedIndicator = document.createElement('div');
+            translatedIndicator.className = 'translated-indicator';
+            translatedIndicator.textContent = 'translated';
+            messageElement.querySelector('.message-content').appendChild(translatedIndicator);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading translations from localStorage:', error);
+  }
+}
+
+// Open edit message modal with translated text
+function openEditMessageModalWithTranslation(messageId, originalText, translatedText) {
+  // Check if modal already exists
+  let modal = document.getElementById('edit-message-modal');
+  
+  // Create modal if it doesn't exist
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'edit-message-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Edit message</h2>
+        <div class="translation-placeholder"></div>
+        <input type="text" id="edit-message-input" class="form-input">
+        <button id="save-edit-btn" class="btn primary full-width">Save</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    modal.querySelector('.close-modal').addEventListener('click', function() {
+      modal.style.display = 'none';
+      modal.classList.remove('translation-mode');
+      const placeholder = modal.querySelector('.translation-placeholder');
+      if (placeholder) placeholder.textContent = '';
+    });
+    
+    // Close on click outside the modal content
+    window.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('translation-mode');
+        const placeholder = modal.querySelector('.translation-placeholder');
+        if (placeholder) placeholder.textContent = '';
+      }
+    });
+  }
+  
+  // Add translation mode class
+  modal.classList.add('translation-mode');
+  
+  // Set translation placeholder
+  const placeholder = modal.querySelector('.translation-placeholder');
+  if (placeholder) placeholder.textContent = `Original: "${originalText}"`;
+  
+  // Update modal title
+  const modalTitle = modal.querySelector('h2');
+  if (modalTitle) modalTitle.textContent = 'Edit message';
+  
+  // Set translated text
+  const messageInput = modal.querySelector('#edit-message-input');
+  messageInput.value = translatedText;
+  
+  // Update save button action
+  const saveButton = modal.querySelector('#save-edit-btn');
+  
+  // Remove existing event listeners from the save button
+  const newSaveButton = saveButton.cloneNode(true);
+  saveButton.parentNode.replaceChild(newSaveButton, saveButton);
+  
+  // Add new event listener
+  newSaveButton.addEventListener('click', function() {
+    const newText = messageInput.value.trim();
+    if (newText && newText !== originalText) {
+      // Update message through API
+      updateMessage(messageId, newText);
+      
+      // Update UI immediately for better user experience
+      const messageElement = document.querySelector(`.message[data-id="${messageId}"]`);
+      if (messageElement) {
+        // Mark as translated with indicator
+        messageElement.setAttribute('data-translated', 'true');
+        
+        // Add translated indicator if it doesn't exist
+        let translatedIndicator = messageElement.querySelector('.translated-indicator');
+        if (!translatedIndicator) {
+          translatedIndicator = document.createElement('div');
+          translatedIndicator.className = 'translated-indicator';
+          translatedIndicator.textContent = 'translated';
+          messageElement.querySelector('.message-content').appendChild(translatedIndicator);
+        }
+        
+        // Save to localStorage so it persists after refresh
+        saveTranslationToStorage(messageId, originalText, newText);
+      }
+    }
+    modal.style.display = 'none';
+    modal.classList.remove('translation-mode');
+  });
+  
+  // Show modal
+  modal.style.display = 'block';
+  
+  // Focus on input
+  messageInput.focus();
 }

@@ -1,6 +1,7 @@
 import json
 from flask import Blueprint, jsonify, request, render_template, flash, redirect, url_for, session
 from models import db, User, Message, Group, GroupMember, Contact, Setting
+from sqlalchemy import text
 
 admin = Blueprint('admin', __name__)
 
@@ -157,12 +158,18 @@ def admin_delete_user(user_id):
         if hasattr(user, 'is_admin') and user.is_admin:
             return jsonify(success=False, message="Cannot delete admin users")
         
-        # Delete user's messages
+        # Handle message references before deleting (important for foreign key constraints)
+        # First set receiver_id to NULL for messages received by this user
+        db.session.execute(
+            text("UPDATE messages SET receiver_id = NULL WHERE receiver_id = :user_id"), 
+            {"user_id": user_id}
+        )
+        
+        # Delete messages sent by this user
         Message.query.filter_by(sender_id=user_id).delete()
         
         # Remove user from groups
-        for membership in GroupMember.query.filter_by(user_id=user_id).all():
-            db.session.delete(membership)
+        GroupMember.query.filter_by(user_id=user_id).delete()
         
         # Delete user's contacts
         Contact.query.filter_by(user_id=user_id).delete()

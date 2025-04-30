@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, session
-from models import db, Message, User, Contact, Group, GroupMember
+from models import db, Message, User, Contact, Group, GroupMember, Setting
 from datetime import datetime
+import json
+from routes.ai import check_message_moderation
 
 chat = Blueprint('chat', __name__)
 
@@ -72,6 +74,35 @@ def send_message():
     
     if not message_text:
         return jsonify({"success": False, "message": "Message text is required"}), 400
+    
+    # Check message against blocked hashtags
+    try:
+        # Get blocked hashtags from settings
+        setting = Setting.query.filter_by(key='blocked_hashtags').first()
+        if setting and setting.value:
+            blocked_hashtags = json.loads(setting.value)
+            # Convert message to lowercase for case-insensitive comparison
+            message_lower = message_text.lower()
+            message_words = message_lower.split()
+            
+            # Check if any blocked hashtag (case-insensitive) is in the message words
+            for hashtag in blocked_hashtags:
+                if hashtag.lower() in message_words:
+                    return jsonify({"success": False, "message": "Message contains inappropriate content"}), 400
+            
+            # If simple check passes and AI moderation is enabled, do AI check
+            ai_setting = Setting.query.filter_by(key='ai_moderation_enabled').first()
+            if ai_setting and ai_setting.value.lower() == 'true':
+                is_appropriate, reason = check_message_moderation(message_text, blocked_hashtags)
+                if not is_appropriate:
+                    return jsonify({
+                        "success": False, 
+                        "message": "Message contains inappropriate content",
+                        "details": reason
+                    }), 400
+    except Exception as e:
+        # Log the error but don't block the message if there's an error checking
+        print(f"Error checking content moderation: {str(e)}")
     
     if group_id:
         # Check if user is a member of the group

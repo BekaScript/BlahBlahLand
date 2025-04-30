@@ -293,8 +293,9 @@
   background-color: #fff;
   position: relative;
   outline: none;
-  display: inline-block; /* Ensure content width is based on content */
-  width: auto; /* Allow width to be determined by content */
+  display: inline-block;
+  width: auto;
+  margin-left: 15px;
 }
 
 /* Add outline to contact messages */
@@ -304,6 +305,8 @@
 
 .message.own .message-content {
   background-color: #DCF8C6;
+  margin-left: 0;
+  margin-right: 15px;
 }
 
 .sender-name {
@@ -323,7 +326,7 @@
 /* Message action buttons */
 .message-actions {
   position: absolute;
-  left: -60px;
+  left: -80px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -334,7 +337,21 @@
 
 .message-content:hover .message-actions {
   opacity: 1;
-  left: -68px;
+  left: -100px;
+}
+
+/* Special handling for non-own messages */
+.message:not(.own) .message-actions {
+  left: auto;
+  right: 10px;
+  top: 10px;
+  transform: none;
+}
+
+.message:not(.own) .message-content:hover .message-actions {
+  left: auto;
+  right: 10px;
+  opacity: 1;
 }
 
 .message-actions button {
@@ -357,6 +374,26 @@
 
 .message-actions .delete-btn:hover {
   background-color: #ffebee;
+}
+
+.message-actions .translate-btn:hover {
+  background-color: #e3f2fd;
+}
+
+.message-actions .translate-btn {
+  color: #2196F3;
+}
+
+/* Style for the translation placeholder text in edit modal */
+.translation-placeholder {
+  font-style: italic;
+  color: #2196F3;
+  font-size: 0.9em;
+  margin-bottom: 5px;
+}
+
+#edit-message-modal.translation-mode .modal-content h2 {
+  color: #2196F3;
 }
 
 /* Edit message modal */
@@ -1097,4 +1134,15 @@
   max-width: 400px;
   border-radius: 15px;
   padding: 20px;
+}
+
+/* Translated indicator styling */
+.translated-indicator {
+  font-size: 0.75em;
+  color: #2196F3;
+  font-style: italic;
+  padding: 2px 0;
+  margin-top: 4px;
+  font-weight: 500;
+  display: block;
 }

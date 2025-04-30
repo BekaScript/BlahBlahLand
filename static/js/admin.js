@@ -19,8 +19,8 @@ function initAdminPanel() {
   // Initialize modals
   initModals();
   
-  // Initialize settings
-  initSettings();
+  // Initialize content moderation
+  initContentModeration();
   
   // Initialize logout
   initLogout();
@@ -335,8 +335,8 @@ function deleteUser(userId) {
     });
 }
 
-// Initialize settings
-function initSettings() {
+// Initialize content moderation (previously settings)
+function initContentModeration() {
   // Save blocked hashtags
   const saveHashtagsBtn = document.getElementById('save-hashtags');
   if (saveHashtagsBtn) {
@@ -411,6 +411,9 @@ function initSettings() {
         });
     });
   }
+  
+  // Load blocked hashtags
+  loadBlockedHashtags();
 }
 
 // Initialize logout
@@ -438,4 +441,21 @@ function initLogout() {
         });
     });
   }
+}
+
+// Load blocked hashtags from server
+function loadBlockedHashtags() {
+  const blockedHashtagsTextarea = document.getElementById('blocked-hashtags');
+  if (!blockedHashtagsTextarea) return;
+  
+  fetch('/api/admin/settings/blocked-hashtags')
+    .then(response => response.json())
+    .then(data => {
+      if (data.success && data.hashtags) {
+        blockedHashtagsTextarea.value = data.hashtags.join(', ');
+      }
+    })
+    .catch(error => {
+      console.error('Error loading blocked hashtags:', error);
+    });
 } 

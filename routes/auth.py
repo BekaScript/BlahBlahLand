@@ -49,6 +49,10 @@ def login():
         user = User.query.filter_by(username=username_or_email).first()
 
     if user and check_password_hash(user.password_hash, password):
+        # Check if user is banned
+        if hasattr(user, "is_banned") and user.is_banned:
+            return jsonify({"success": False, "message": "Your account has been banned"}), 403
+        
         session['user_id'] = user.id
         session['username'] = user.username
         session['is_admin'] = user.is_admin if hasattr(user, 'is_admin') else False
