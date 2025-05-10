@@ -159,11 +159,8 @@ def admin_delete_user(user_id):
             return jsonify(success=False, message="Cannot delete admin users")
         
         # Handle message references before deleting (important for foreign key constraints)
-        # First set receiver_id to NULL for messages received by this user
-        db.session.execute(
-            text("UPDATE messages SET receiver_id = NULL WHERE receiver_id = :user_id"), 
-            {"user_id": user_id}
-        )
+        # First delete messages received by this user instead of setting to NULL
+        Message.query.filter_by(receiver_id=user_id).delete()
         
         # Delete messages sent by this user
         Message.query.filter_by(sender_id=user_id).delete()
