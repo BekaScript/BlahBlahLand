@@ -180,7 +180,7 @@ Be strict and make sure to catch inappropriate content even when it uses euphemi
                     "content": message_text
                 }
             ],
-            model="llama3-8b-8192",  # Using a default Groq model
+            model="llama-3.1-8b-instant",  # Using a default Groq model
         )
 
         # Extract the AI's moderation decision
