@@ -17,4 +17,4 @@ class Config:
     MAIL_DEFAULT_SENDER = ('BlahBlahLand', 'bekbolsunysmanov07@gmail.com')
     
     # AI API configuration
-    GROQ_API_KEY = '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'
+    GROQ_API_KEY = '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'
